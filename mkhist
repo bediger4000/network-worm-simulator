@@ -1,0 +1,12 @@
+#!/bin/sh
+# $Id: mkhist,v 1.2 2003/09/20 05:04:45 bediger Exp $
+# create a distribution of hits-per-host.  Since number
+# of hits per host is an integer value, it's sort of like
+# a histogram.
+cat $@ | fgrep '#hits' | cut -f3 | sort -n | uniq -c |
+awk 'BEGIN {hosts = 0; probecnt = 0;}\
+{probes[$2] = $1; hosts += $1; probecnt += $1 * $2;}\
+END { for (cnt in probes) {\
+	print cnt, probes[cnt]/hosts};\
+	print "# total probes ", probecnt, ", total hosts ", hosts\
+}' | sort -n +0 -1

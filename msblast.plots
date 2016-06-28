@@ -1,0 +1,36 @@
+# $Id: msblast.plots,v 1.3 2003/09/20 05:05:23 bediger Exp $
+# Copyright 2003, Bruce Ediger
+# This file is part of NWS.
+#
+# NWS is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# NWS is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with NWS; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+set yrange [0:12000]
+set xlabel "Timestep"
+set ylabel "Number of infected hosts"
+set title "msblast and Random Probing worms compared"
+set data style points
+set term png
+set out 'msblast.png'
+plot 'mean.dat' using 1:3 title 'Random probe worm, random victim addresses', \
+	'random.banded.dat' using 1:3 title 'Random probe worm, banded victim addresses', \
+	'msblast_random_mean.dat' using 1:4 title 'msblast probe worm, random victim addresses', \
+	'msblast_banded_mean.dat' using 1:4 title 'msblast probe worm, banded victim addresses'
+#set autoscale
+#set data style histeps
+#set xlabel "Probes per host"
+#set ylabel "Proportion of hosts"
+#plot 'random.hist' using 1:2 title 'Random probe worm', \
+#    'msblast.hist' using 1:2 title 'Random init, sequential probe worm'
+#

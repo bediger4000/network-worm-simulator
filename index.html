@@ -1,0 +1,2570 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML Basic 1.0//EN" "file:///usr/share/sgml/xhtml/xhtml-1.0/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en-US">
+<!-- Copyright (C) 2003 Bruce Ediger.  -->
+<!--
+# This file is part of NWS.
+#
+# NWS is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# NWS is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with NWS; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+-->
+<!-- $Id: index.html,v 1.34 2003/09/26 03:28:30 bediger Exp $ -->
+<head>
+<title>Simulating Network Worms</title>
+<script language="JavaScript" type="text/javascript">
+<!--
+//<![CDATA[
+// Nothing so far.
+//]]> -->
+</script>
+</head>
+<body bgcolor="#FFFFFF" text="#000000">
+<h1>Simulating Network Worms</h1>
+<p>
+<a href="mailto:eballen1@qwest.net">Bruce Ediger</a>
+</p>
+<h2>Introduction</h2>
+<p>
+This document describes the design and implementation of a network worm simulation system,
+named &quot;NWS&quot;.
+It also describes using the NWS system to model 
+aspects of real world worms, and the results of those simulations.
+</p>
+<h3>Definition of &quot;network worm&quot;</h3>
+<p>
+Currently, it seems unfashionable to strictly define "worm" or "virus"
+or any other perfectly good term.  I think that commercial interests
+drive this - it's simpler and more profitable to threaten non-technical
+people with a "worm"
+than it is to address the real problems of a software and hardware
+monoculture.
+For purposes of defining the scope of NWS, I wanted to define "network
+worm".
+</p>
+<p>
+For the purposes of this document 
+a &quot;worm&quot; consists of a process or set of processes that
+replicates without human intervention
+by creating an executing copy of itself on another computer
+via some form of network communication.
+</p>
+<p>
+Other similar definitions exist.
+</p>
+<p>
+The <a href="http://www.catb.org/~esr/jargon/html/W/worm.html">Jargon File entry for worm says</a><sup><a href="#B1">[1]</a></sup>: A program that propagates itself over a network, reproducing itself as it goes.
+</p>
+<p>
+<a href="http://www.linuxsecurity.com/resource_files/documentation/virus-writing-HOWTO/_html/intro.html#what.exactly.is.a.virus">Alexander Bartolich</a><sup><a href="#B2">[2]</a></sup>
+of the ELF virus writing HOW-TO has this definition:
+A worm is a program that penetrates other running programs.
+Penetration means to copy the executable code of the worm into the active process image of the host.
+</p>
+<p>
+The definition seems to describe
+other forms of &quot;mobile code&quot; like Java applets. 
+One has to realize that a worm spreads itself - a user has to
+ask to download a Java applet, so applets don't count as worms.
+Email viruses like Klez or SirCam also require human intervention.
+Before the virus activates, the user has to at least open the email
+carrying the virus, and
+possibly even open the attached document that contains virus code.
+The typical mass-mailer virus doesn't qualify as a worm by the definition
+above,
+despite the &quot;worm&quot; names given to mass-mailing viruses by anti-virus companies
+and mass media.
+Cliff Changchun Zou's work on <a href="http://tennis.ecs.umass.edu/~czou/research/emailvirus-techreport.pdf">email virus modeling</a><sup><a href="#B3">[3]</a></sup>
+shows the differences between mass-mailer viruses and network worms.
+</p>
+<p>
+The clause that says &quot;creating an executing copy of itself ...
+via some form of network communication&quot;
+allows us to distinguish between a <a href="http://www.jargon.net/jargonfile/f/forkbomb.html">fork bomb</a><sup><a href="#B4">[4]</a></sup>
+and a worm. A fork bomb consists of many replicating processes on a single machine, without recourse
+to network communication.
+</p>
+<h3>Motivation for simulation</h3>
+<p>
+Various reasons exist for simulating the spread of network worms:
+</p>
+<ul>
+<li>Help reverse-engineer an existing worm</li>
+<li>Design <a href="http://news.bbc.co.uk/1/hi/sci/tech/1344344.stm">counter-worms</a><sup><a href="#B5">[5]</a></sup>
+or <a href="http://csrc.ncsl.nist.gov/nissc/2000/proceedings/papers/601.pdf">beneficial worms</a><sup><a href="#B6">[6]</a></sup>
+</li>
+<li>Design a worm that <a href="http://www.theregister.co.uk/content/archive/19132.html">patches a security hole</a><sup><a href="#B7">[7]</a></sup>
+</li>
+<li>Understand effects of worms on networks</li>
+<li>Determine behavior of possible future worms</li>
+</ul>
+<p>
+My own personal motivation consists of puzzling over the &quot;installed base&quot;
+theory.  I usually encounter this theory in discussion forums like Usenet
+or <a href="http://slashdot.org">Slashdot</a><sup><a href="#B8">[8]</a></sup>. The theory runs like this:
+</p>
+<blockquote>
+Microsoft Product X has more worms than open source Product Y because
+Product X runs on more machines than Product Y.
+</blockquote>
+<p>
+I originally wrote the NWS simulator to try to test
+the &quot;installed base&quot; theory.
+In the course of writing NWS, I've decided that the
+&quot;installed base&quot; theory doesn't have any meaning, for at least
+two reasons.
+</p>
+<ol>
+<li>For some products (IIS and Apache), the theory is false - Apache runs on 
+<a href="http://news.netcraft.com/archives/web_server_survey.html">about twice</a><sup><a href="#B9">[9]</a></sup>
+the number of web servers that IIS runs on.</li>
+<li>For other products (Outlook/Exchange), one can't falsify the theory.
+Unless some
+miracle caused reversed installed bases, no way exists to test the theory.
+</li>
+</ol>
+<p>
+The installed base theory amounts to special pleading for the use
+of Microsoft products.
+</p>
+<h3>Other Simulators</h3>
+<p>
+<a href="http://www.icir.org/vern/papers/cdc-usenix-sec02/">Staniford, Paxson and Weaver</a><sup><a href="#B10">[10]</a></sup>,
+give sparse details on simulating a "Warhol worm".
+</p>
+<p>
+<a href="http://www.cs.ucsd.edu/users/savage/papers/Infocom03.pdf">Moore,
+Shannon, Voelker and Savage</a><sup><a href="#B11">[11]</a></sup> seem to have modeled the Code Red epidemic
+with some effects of containment measures.  They do not explain their
+simulator at all.
+</p>
+<p>
+<a href="http://tennis.ecs.umass.edu/~czou/research/codered.pdf">Zou, Gong and Towsley</a>
+<sup><a href="#B12">[12]</a></sup>
+modeled Code Red propagation, in an attempt to better match observed behavior.
+Apparently, they did their modeling using numerical
+solutions to differential equations.
+</p>
+<p>
+Michael Liljenstam has written
+<a href="http://www.cs.dartmouth.edu/~mili/research/ssf/worm/">SSF.App.Worm</a><sup><a href="#B13">[13]</a></sup>,
+a module for the <a href="http://www.ssfnet.org/homePage.html">Scalable Simulation Framework</a><sup><a href="#B14">[14]</a></sup>.
+</p>
+<p>
+<a href="http://www.research.ibm.com/antivirus/SciPapers/Kephart/VIRIEEE/virieee.gopher.html">Kephart and White</a>
+<sup><a href="#B15">[15]</a></sup>
+wrote a simulation of email virus spread. The simulator models networks
+with limited connectivity. They didn't fall prey to referring to such viruses
+as "worms".
+</p>
+<p>
+<a href="http://tennis.ecs.umass.edu/~czou/research/emailvirus-techreport.pdf">Zou, Towsley and Gong</a>
+<sup><a href="#B3">[3]</a></sup>
+modeled email virus propagation using numerical simulations.
+They also make a distinction between "network worm" and "email virus".
+</p>
+<h3>NWS function</h3>
+<p>
+NWS provides a Perl programmer with a framework in which to write
+a complete network worm simulation.  The programmer writes
+a Perl program using NWS objects and their methods.  Running the 
+program executes the simulation.
+NWS does require a degree of Perl knowledge, especially to write the worm code.
+It does not allow a user to eschew all intelligence by limiting him or her
+to actions or categories of actions I've already thought of.
+</p>
+<h3>Download</h3>
+<p>
+You can download the <a href="nws.tar.gz">NWS simulator</a> and try the simulations
+described in this document or use NWS to write your own. I developed NWS in a Linux command line environment,
+so the simulations print to STDOUT. Windows users may have a hard time
+getting these simulations to work, but they should work unchanged on all modern
+Unix, Linux or BSD systems that have Perl installed.
+</p>
+<h4>Licensing</h4>
+<p>
+The NWS network worm simulator is licensed under the
+<a href="http://www.gnu.org/licenses/gpl.txt">GNU General Public License</a><sup><a href="#B16">[16]</a></sup> (GPL).
+</p>
+<h2>Framework Design</h2>
+<p>
+I wanted to write a system that allowed simulation of many different
+real-life worms. When I began, I did not understand what this
+entailed.  At a minimum, I believed that I needed flexible configuration
+and setup, to allow trying different population sizes (including
+number and "species" of worms) and address
+space sizes.  I also chose to have NWS actually execute "worm code" in
+each entity a worm infects. Actually executing code allows a worm
+to perform arbitrary actions just like in real life.  I wanted to
+make any given simulation as believable as possible.
+</p>
+<p>
+Between setup and configuration and executing code for a worm,
+any simulator needed to include some kind of interpreted language.
+I chose Perl, mainly because I had an easy time writing early
+versions of an SIS epidemic in Perl.
+I wrote the NWS framework itself in the same language
+that NWS users write worms.
+</p>
+<p>
+I also chose to write NWS in a simplistic object oriented
+fashion. Objects in an NWS program
+directly correspond to real life entities that
+comprise a real life network: hosts, software, and messages.
+This should make simulations much more believable, since a user can
+directly count uninfected hosts or worm hosts or messages passed.
+</p>
+<h3>Simulated worms contain actual code</h3>
+<p>
+Petri nets, or finite state machines or numerical simulations
+could simulate any given worm, but not allow the curious investigator to make
+simulations of some other type of worm, or more than one strain of
+worm in a simulation.
+</p>
+<p>
+Numerical simulations don't easily allow discontinuities like dormant stages
+in a worm's life cycle, or introductions of counter-worms after
+worm infections reach epidemic proportions.
+<!-- Does it merit mentioning the psychological difficulties in
+interpreting states entered or exited or somesuch? -->
+</p>
+<p>
+One can write a simulator for any given worm without
+executing &quot;worm code&quot;, but that simulator wouldn't have any kind
+of general purpose capability.
+</p>
+<p>
+Real life network worms execute arbitrary code once they've 
+replicated themselves on a new host.
+The only way to model this generality allows simulated worms
+the same ability: simulated worms must execute some form of code.
+The NWS framework allows and encourages this.
+</p>
+<p>
+Simulators that operate without executing worm code will end up
+corroborating
+specific cases written for and executed in a general purpose worm simulator.
+</p>
+<h3>Fully-connected network</h3>
+<p>
+NWS simulations model fully-connected networks,
+using &quot;network&quot; in a more graph theoretic sense rather than
+a TCP/IP sense.
+Every network-connected entity
+can send a message to any other entity in the simulation.
+Each network-connected entity has an address consisting of a single number.
+Writing a simulation requires an NWS user to set the
+address space size, the
+largest number that gets used as an address.
+</p>
+<p>
+In contrast, mass-mailing Outlook viruses don't operate in a fully-connected network.
+Many mass-mailing Outlook viruses use Outlook's address book
+or SMTP client, while a few look through the infected
+machine's file system to find email addresses.  Modeling a mass-mailer virus
+would involve deciding how many email addresses to allot to each instance of the virus,
+and deciding on a probability that represents how often a virus recipient clicks on
+the virus attachment.  Not every instance of a mass-mailer virus would
+send itself to
+all the email addresses in the simulation, so the network of email
+addresses would not qualify as fully-connected.
+</p>
+<p>
+Assuming fully-connected networks seems overly optimistic relative to the
+real Internet, given work such as
+Arbor Networks paper on 
+<a href="http://arbornetworks.com/downloads/dark_address_space.pdf">dark address space</a>
+<sup><a href="#B17">[17]</a></sup>
+and the prevalence of corporate intranets connected to the Internet via gateways 
+and firewalls that do
+network address translation.
+</p>
+<h3>Object oriented design mimics real networks</h3>
+<p>
+Naively, a network links entities called hosts.  A host can
+contain instances of software that the host executes periodically.
+The network allows hosts to communicate with each other via messages
+or streams of messages.
+</p>
+<p>
+The NWS framework demands that its users create objects
+that correspond directly
+to entities in a real network. NWS users have to create an instance
+of class <code><a href="#NETWORK">NWS::Network</a></code>,
+and populate the instance of
+<code>NWS::Network</code> with instances
+of class <code><a href="#HOST">NWS::Host</a></code>.
+<code>NWS::Host</code> instances contain
+<code><a href="#SOFTWARE">NWS::Software</a></code> instances.
+</p>
+<p>
+Due to CPU architecture or
+operating system executing on the host, or even due to particular 
+versions of software
+executing under the operating system, real life worms can only replicate
+themselves on certain hosts.
+Users of NWS can create instances of class <code>NWS::Host</code> that 
+specify CPU architecture or operating system name.  Instances of <code>NWS::Host</code>
+can contain instances of class <code>NWS::Software</code> that specifically name the
+&quot;software&quot; that the Host executes.
+</p>
+<p>
+When <code>NWS::Host</code> instances receive
+<code><a href="#MESSAGE">NWS::Message</a></code> instances,
+the <code>NWS::Host</code> delivers <code>NWS::Message</code> instances to
+<code>NWS::Software</code> instances.  <code>NWS::Host</code>
+instances have numerical
+addresses in a network, analogous to Internet Protocol addresses.
+Inside an <code>NWS::Host</code>, names of <code>NWS::Software</code> instances
+constitute the analog to TCP or UDP port numbers.
+An <code>NWS::Message</code> gets delivered to a host by numerical address,
+but the <code>Message</code> gets
+ignored if the <code>Message</code> instance does not contain an
+identifier that matches the identifier of the <code>Host</code>
+instance receiving it.
+After a match on <code>Host</code> identifier, the <code>Host</code>
+will ignore the
+<code>Message</code> instance
+if the <code>Message</code> does not name a <code>Software</code> instance the
+<code>Host</code> contains.
+</p>
+<p>
+This style probably has some detrimental effect on execution speed.
+I hope that this style promotes more believable simulations.
+</p>
+<h3>Use of Perl for both Framework and Worms</h3>
+<p>
+Users of NWS write simulation programs in Perl, incorporating and using NWS
+as a set of library modules.
+Users also write worm code for their simulations in Perl.
+The same programming language gets used for setup,
+configuration and for subjects under study in the simulation.
+</p>
+<p>
+One possible alternative would have the simulator framework
+(network, network communications, execution scheduling, etc)
+written in a traditional compiled language like C.
+The worm code would exist as fragments of a
+scripting language, probably an easily embeddable scripting
+language like <a href="http://www.tcl.tk/">Tcl</a><sup><a href="#B18">[18]</a></sup>,
+<a href="http://www.lua.org/ddj.html">Lua</a><sup><a href="#B19">[19]</a></sup> or
+<a href="http://www.s-lang.org/">S-lang</a><sup><a href="#B20">[20]</a></sup>.
+Other general simulators, like the
+<a href="http://www.isi.edu/nsnam/ns/">ns</a><sup><a href="#B21">[21]</a></sup> network simulator,
+have implemented exactly the "interpreted setup and configuration,
+compiled back-end" design.
+I decided against this approach.
+</p>
+<p>
+Experience developing various worm simulations convinces me
+that NWS users will modify the simulator framework
+to suit their purposes.
+I often modified the simulator framework
+to serve special purposes like counting message receptions,
+or testing different message delivery algorithms.
+Writing NWS with a traditional compiled language
+"back end", and interpreted user code for setup, configuration
+and worm code burden one set of users, and handicap
+another.
+Some users will want to obtain different information
+from a simulation than the NWS framework provides by default.
+These users would have
+to change the "back end" code to collect the information they
+want while they simultaneously write the simulation in question.
+These users would have to write simulations in two vastly different
+programming languages at the same time - the "back end" and the 
+"front end" languages.
+This two-language design would unnecessarily limit other users who only
+understand the interpreted user code.
+</p>
+<h4>Perl's Advantages</h4>
+<p>
+Many people have experience with Perl:
+Perl implementations exist for many or all modern systems.
+Lots of web sites and books offer documentation on Perl and how to
+effectively write Perl programs.
+This means that the potential audience
+of users of NWS ends up vastly greater than
+an alternative simulator design that requires its users
+to have familiarity with at least two languages.
+</p>
+<h4>Perl's Disadvantages</h4>
+<p>
+Using Perl for both worms and the simulator library code
+can make debugging difficult. NWS users may find it difficult to distinguish
+errors in worm code from errors in library code.
+Perl programs can use substantial amounts of memory, and they can execute
+slower than one would like. Users of NWS
+will never have the ability to model the entire Internet, as did
+<a href="http://www.icir.org/vern/papers/cdc-usenix-sec02/">Staniford, Paxson and Weaver</a><sup><a href="#B10">[10]</a></sup>.
+</p>
+<h3>Deviations from Reality</h3>
+<p>
+Any simulation discards elements of the real system it models. This causes
+simulations to behave differently than real life systems.
+People using the NWS simulator
+should realize that their simulations differ
+from reality in at least these specific ways:
+</p>
+<ul>
+<li>Time passes in discrete steps, rather than continuously.</li>
+<li>Communication between network-attached entities happens via message passing,
+and all message sent in a given time step get delivered in that same time step.
+</li>
+<li>Vulnerabilities are trivial, consisting of nothing more than a flag variable
+set in an <code>NWS::Software</code> instance.</li>
+<li>Simulated networks do not contain performance bottlenecks like routers,
+firewalls or bridges.</li>
+<li>All hosts exhibit the same performance.</li>
+<li>Network communications have infinite bandwidth.</li>
+</ul>
+<p>
+I think that this combination of differences from reality prevents
+one from making any kind
+of correspondence between time steps in a simulation, and real-world
+time. It does not prevent using the NWS framework to compare
+qualitative differences.  For example, an NWS user could check
+relative efficiencies of 
+<a href="#PERMUTATION">two different ways to probe</a> the simulated network's
+address space.
+</p>
+<h2>Validation</h2>
+<p>
+Before trying anything difficult or interesting I attempted to validate
+NWS code and behavior.
+</p>
+<h3>Class and method level tests</h3>
+<p>
+I wrote simple test harnesses to execute 
+as much NWS code as possible, and verify the code's behavior.
+</p>
+<ul>
+<li><a href="test_host.pl">Call all NWS::Host methods</a></li>
+<li><a href="test_network.pl">Call all NWS::Network methods</a></li>
+<li><a href="message_delivery.pl">Ensure out-of-order message delivery</a></li>
+<li><a href="worm_execution.pl">Worm code execution</a></li>
+<li><a href="worm_exploit.pl">A tricky worm code execution case</a></li>
+<li><a href="selfmsg.pl">Short-circuit Message delivery to self</a></li>
+<li><a href="addr_space_end.pl">Ensure no bias due to address exists</a></li>
+<li><a href="all_messages.pl">Ensure all messages sent in a time step get delivered during the same time step</a></li>
+</ul>
+<p>
+The NWS framework code passes all these tests. Users who modify the
+framework for their own purposes should consider running these test
+cases (and maybe others) to ensure they haven't broken the framework.
+</p>
+<h3><a name="SIS">SIS model</a></h3>
+<a href="generic.pl">SIS simulator code</a>
+<p>
+The <a href="http://www.zoo.ufl.edu/bolker/eep-2000/si1.html">Susceptible-Infected-Susceptible model</a><sup><a href="#B22">[22]</a></sup> constitutes one of the simplest mathematical
+models of an epidemic. Each entity in the population of the model resides in one of
+two states:
+</p>
+<ul>
+<li>Susceptible</li>
+<li>Infected</li>
+</ul>
+<p>
+Entities makes transitions from one state to another according
+to some probability.
+Entities participating in biological
+epidemics can make transitions from susceptible to
+infected, and possibly from infected to susceptible, depending on
+the illness.  Suffering through the common cold only confers
+a temporary resistance. Realistic models have to
+account for this.
+</p>
+<p>
+If no transitions from Infected to Susceptible states take place, this model approximately matches any
+number of real life worms:
+the <a href="ftp://ftp.sri.com/risks/8/risks-8.02">1988 DECnet &quot;Father Christmas&quot; worm</a><sup><a href="#B23">[23]</a></sup>,
+<a href="http://www.whitehats.com/library/worms/adm/index.html">1998 ADMw0rm</a><sup><a href="#B24">[24]</a></sup>,
+<a href="http://www.caida.org/analysis/security/code-red/#crv2">the first arrival of Code Red v2</a><sup><a href="#B25">[25]</a></sup>,
+<a href="http://isc.incidents.org/analysis.html?id=167">2002 Slapper worm</a><sup><a href="#B26">[26]</a></sup>
+(also <a href="http://www.europe.f-secure.com/slapper/">here</a><sup><a href="#B27">[27]</a></sup>).
+</p>
+<h4>Derivation of theoretical analytical solution</h4>
+<p>
+To validate the NWS framework, I need some kind of standard
+against which to measure it. Fortunately, SIS epidemics have an
+analytical solution.  I'll derive most of the solution below in
+terms of a network worm and a population of exploitable hosts.
+</p>
+<p>
+I use the following symbols:
+</p>
+<table>
+<tr><td><code>N</code></td><td>Number of entities in the population</td><td></td></tr>
+<tr><td><code>S</code></td><td>Address space size</td><td></td></tr>
+<tr><td><code>P</code></td><td>Probability of randomly picking an address that maps to an entity</td></tr>
+<tr><td><code>V</code></td><td>Number of infected entities in population at some time</td></tr>
+<tr><td><code>V<sub>0</sub></code></td><td>Number of infected entities in population at the start of the simulation</td></tr>
+</table>
+<p>
+Assume that the worms pick addresses at random.  The probability of
+picking an address that maps to a host in the population under consideration
+amounts to:
+</p>
+<p>
+<code>P = (number of hosts)/(address space size) = N/S</code>.
+</p>
+<p>
+The fraction of uninfected entities amounts to:
+</p>
+<p>
+<code>1 - V/N</code>
+</p>
+<p>
+At any given instant, <code>V</code> number of worms try to infect
+the remaining uninfected entities.  Since the worms have a probability
+of infecting
+the remaining uninfected proportion of entities, and only so many
+uninfected entities remain, the change in
+the number of infected hosts amounts to:
+</p>
+<p>
+<code>P(1-V/N)V</code>
+</p>
+<p>
+A real set of infected hosts operating in the real Internet would
+send out probes continuously, so I get to magically wave
+my hands and convert the change in number of infected hosts
+to a differential equation:
+</p>
+<p>
+<code><sup>dV</sup>/<sub>dt</sub> = P(1-V/N)V</code>
+</p>
+<p>
+This differential equation, known as the Logistic Equation,
+turns out to have an exact solution.
+The solution involves some onerous bookkeeping called
+<a href="http://www.ugrad.math.ubc.ca/coursedoc/math101/notes/moreApps/logistic.html">integration by partial fractions</a>.
+<sup><a href="#B28">[28]</a></sup>
+The exact, analytical solution:
+</p>
+<p>
+<code>V = V<sub>0</sub>/[(1 - <sup>V<sub>0</sub></sup>/<sub>N</sub>)e<sup>-Pt</sup> + <sup>V<sub>0</sub></sup>/<sub>N</sub>]</code>
+</p>
+<p>
+This equation has some interesting properties. It has time starting
+at zero and going forwards.  It works in terms of the total population,
+the initial number of infected hosts, and the probability of getting
+a &quot;hit&quot; on a member of the population.
+</p>
+<p>
+If the Logistic Equation's solution matches reality,
+an investigator could reasonably work out when
+a worm-writer released a worm. One would only have to make  a few assumptions about
+population of exploitable hosts, address space size, and how many
+worms got released initially.
+</p>
+<p>
+<a href="http://www.icir.org/vern/papers/cdc-usenix-sec02/">Staniford, Paxson and Weaver's</a><sup><a href="#B10">[10]</a></sup>
+"Hit-list Scanning" ends up as nothing more than a large value of <code>V<sub>0</sub></code>
+in this form of the solution to the Logistic Equation.
+</p>
+<h4>Simulation Description</h4>
+<p>
+I used an address space of 65535 (16 bits of address), and I populated
+it with seven 
+worm <code>NWS::Host</code> instance,
+and 9993 possible victim <code>NWS::Host</code> instances,
+for a total of 10000 entities in the population.
+All entities reside at randomly assigned addresses in the address space.
+The simulation runs for 135 time steps or until only 1% of
+the 9993 possible victims remain uninfected.
+I will clarify the choice of seven initially infected entities below.
+</p>
+<h4>Comparison of NWS with analytical solution</h4>
+<p>
+The NWS simulation doesn't match the analytical solution particularly well.
+I believe the difference arises from stepwise treatment of time, and a discrete
+population.
+The NWS simulation takes discrete time steps, while the analytical solution
+has continuous time.
+Infections happen in whole numbers of entities
+per time step.
+The NWS model can only show 1 or 3 or 97
+entities infected at a given time step, not 1.237 or 3.532 or 97.8 entities
+infected at 10.346 hours.
+NWS has inefficiencies (it takes longer to get to 99% infection) relative
+to analytical solution for these reasons.
+</p>
+<h4>Discrete Euler's Method solution</h4>
+<p>
+The analytical solution to the Logistic Equation
+provides an upper boundary to the NWS SIS simulation.
+I tried a cheap-and-dirty
+variant of <a href="http://www.math.ubc.ca/~feldman/math/odesolvers.pdf">Euler's Method</a><sup><a href="#B29">[29]</a></sup>
+of solving differential equations to provide a lower boundary.
+I made the variant round down to the next lowest integer
+value of the number of entities infected over a given elapsed time.
+</p>
+<p>
+Starting with the Logistic Equation:<br/><code><sup>dV</sup>/<sub>dt</sub> = P(1-V/N)V</code><br/>
+I'll make the differential <code><sup>dV</sup>/<sub>dt</sub></code> into
+a ratio of finite quantities,<br/><code><sup>&Delta;V</sup>/<sub>&Delta;t</sub>  = P(1-V/N)V</code><br/>
+If I use a small enough time step (numerical value of <code>&Delta;t</code>)
+the Euler's method approximation should still remain accurate.  Multiply both sides of
+the equation by <code>&Delta;t</code>, and use <code>int()</code> function to
+mean &quot;next lowest integer value&quot;:<br/>
+<code>&Delta;V = int(P(1-V/N)V&Delta;t)</code>
+</p>
+<p>
+Euler's method has you calculate a value of <code>&Delta;V</code>
+based on the current value
+of <code>V</code>, <code>P</code> and <code>&Delta;t</code>.
+The algorithm adds <code>&Delta;V</code> to the current value of <code>V</code>
+to get
+the next time step's value of <code>V</code>, an iterative solution:
+</p>
+<code>V<sub>i+1</sub> = V<sub>i</sub> + int(P(1-V<sub>i</sub>/N)V<sub>i</sub>&Delta;t</code>
+<p>
+This necessarily undershoots the analytical solution for two reason.
+First, rounding down to the next lowest integer value of <code>&Delta;t</code>
+provides the biggest loss relative to the analytical solution.
+Second, the iterative solution uses the slope of the function at the
+start of the time step to shoot the value of the function at the end of
+the time step. The analytical solution shows us that the curve
+only goes up, it never goes down, and the curve is concave
+for the first half of the simulation's run time.
+Using the slope at the start of the time step under estimates
+the value of the function at the end of the time step for the
+concave part of the curve.
+</p>
+<p>
+The Euler's method solution graphed below started with
+values of <code>V</code> = 7, <code>N</code> = 65535,
+<code>P</code> = 10000/65535 = 0.1525
+and <code>&Delta;t</code> = 1 which match the NWS simulation.
+I chose the initial value of <code>V</code>
+so that the value of <code>&Delta;V</code> comes out to 1 during the first time step.
+The values of <code>P</code> and <code>1-V/N</code> 
+during the first time step mean that any smaller initial value of <code>V</code>
+will end up with 
+<code>&Delta;V</code> = 0.
+This Euler's method simulation breaks down for initial values of <code>V</code>
+less than 7.
+</p>
+<h4>SIS Simulation Results</h4>
+<p>
+I ran the <a href="generic.pl">SIS simulation</a> 20 times.
+I reduced the 20 simulation outputs to an arithmetic mean of
+the number of infected hosts at each time step.
+The graph below compares the mean of 20 SIS simulation runs
+with the analytical solution, and the results of running the
+<a href="discrete_sis.pl">discrete Euler's method numerical approximation</a> derived above.
+</p>
+<center><img src="sis.mean.png" alt="SIS model results"/></center>
+<h4>SIS Simulation Conclusions</h4>
+<p>
+The mean of 20 runs of the NWS SIS simulation reaches 99% infection
+slower than the analytical solution would have it, and falls reasonably close
+to the discrete Euler's Method numerical simulation.
+I take this to mean that the NWS SIS model correctly simulates
+a network worm turned loose in a population of computers without any
+resistance.
+</p>
+<p>
+For small numbers of infected hosts, the real Internet shares the
+"discrete population" property with an NWS simulation.
+This seems to imply that an investigator can't
+use the analytical solution to the Logistic Equation
+to accurately find the time of an initial infection of a real Internet worm.
+</p>
+<p>
+A worm author can take away two, opposing conclusions.
+Start as many worms as possible (a large hit list) to eliminate
+statistical effects on when a
+worm population gets traction, or start a single worm to randomly
+confuse the issue of when the epidemic started.
+</p>
+<h2>Cases of Greater Interest</h2>
+<p>
+Writing a slow, hard to use simulator that could only model
+worms that easier, faster methods can adequately model
+doesn't make sense.  This section illustrates a few cases that more or
+less match real world worms, and don't have an analytical solution
+available.
+</p>
+<h3><a name="SIR">CRclean</a></h3>
+<a href="crclean.pl">NWS simulator code</a><br/>
+<a href="sir.pl">Simple numerical simulation code</a><br/>
+<p>
+Epidemiologists also consider another model of infection:
+<a href="http://www.math.duke.edu/education/ccp/materials/postcalc/sir/contents.html">Susceptible-Infected-Recovered</a><sup><a href="#B30">[30]</a></sup>.
+Observation of biological epidemics like chicken pox or small pox,
+diseases that confer lifetime
+immunity on the survivors, motivate this model.  In an SIR epidemic,
+members of the population reside in one of three states:
+</p>
+<ul>
+<li>Susceptible</li>
+<li>Infected</li>
+<li>Recovered</li>
+</ul>
+<p>
+Members of the population make transitions from one
+state to another according to some probability.
+The SIR model limits transitions to
+</p>
+<ul>
+<li>Susceptible to Infected</li>
+<li>Infected to Recovered</li>
+</ul>
+<p>
+In computer terms, one might describe the states as vulnerable,
+exploited and patched.
+</p>
+<p>
+During the 2001 Code Red worm outbreak, Markus Kern posted code for a
+<a href="http://online.securityfocus.com/archive/82/211462">passively
+spreading worm</a><sup><a href="#B31">[31]</a></sup>.  I don't have much knowledge about IIS in particular,
+and Microsoft products in general, but I gather that when
+a CRclean-infected instance of IIS receives a Code Red URI, CRclean sends
+a copy of itself to the Code Red-infected-host.
+The newly-sent-CRclean infects the Code Red-infected-IIS with itself,
+stops Code Red and patches the previously-infected host to prevent
+re-infection by Code Red. CRclean then starts watching for receipt
+of Code Red URIs.
+</p>
+<p>
+The interaction between IIS, Code Red and CRclean
+matches an SIR epidemic pretty well.  We would consider
+machines running IIS (but not infected with Code Red or CRclean)
+as "susceptible". After infection with Code Red, we would consider
+a machine "infected", and after infection with CRclean, we would
+consider the machine "recovered".
+</p>
+<h4>Derivation of differential equations</h4>
+<p>
+Despite asserting above that this is an interesting case, one that
+doesn't have an analytical solution, I will derive differential equations
+to describe the IIS/Code Red/CRclean interaction.  The differential equations
+that I derive don't have an analytical solution, I can only solve them
+numerically.  Since numerical solutions to systems of differential equations
+are notoriously poorly behaved, deriving a system of differential equations
+for this case
+that may or may not even converge on an answer doesn't render it trivial,
+suitable only for validating the NWS framework.  Differential equations,
+solvable or not, also give insight into the problems they describe that
+simulations do not.
+</p>
+<p>
+I'll use the following symbols to derive differential equations
+that describe an epidemic of Code Red among a population of
+IIS hosts, and automatic patching of the infected hosts by CRclean.
+</p>
+<table>
+<tr><td><code>N</code></td><td>Number of entities in the population</td><td></td></tr>
+<tr><td><code>P</code></td><td>Probability of picking an address that maps to an entity</td></tr>
+<tr><td><code>S</code></td><td>Number of susceptible (uninfected) entities in population at some time</td></tr>
+<tr><td><code>I</code></td><td>Number of infected entities in population at some time</td></tr>
+<tr><td><code>R</code></td><td>Number of recovered entities in population at some time</td></tr>
+</table>
+<p>
+First, the number of susceptible, infected and recovered entities has
+to sum up to the total number of entities in the population:
+</p>
+<p>
+<code>N</code> = <code>S</code> + <code>I</code> + <code>R</code>
+</p>
+<p>
+Next, the differential equation for the rate of change in recovered
+entities.
+Infected entities (Code Red worms in this simulation)
+probe the address space randomly, and they have a probability <code>P</code>
+of picking an address mapping to an entity. Since <code>I</code> infected
+entities exist in the simulation at any given time, <code>PI</code>
+represents the number of probes that hit any entities in the simulation.
+The number of CRclean entities
+equates to the number of recovered entities in this simulation.
+The fraction of recovered entities in the simulation amounts to
+<code>R/N</code>. so the number of probes from Code Red entities
+that hit a CRclean entity is <code>PI(<sup>R</sup>/<sub>N</sub>)</code>.
+Each Code Red probe to a CRclean entity results in one less Code Red entity,
+<code>PI(<sup>R</sup>/<sub>N</sub>)</code>
+amounts to the per-time step change in recovered entities, and
+<code>-PI(<sup>R</sup>/<sub>N</sub>)</code>
+amounts to the per-time step change in the number of infected entities.
+Since these equations model a continuous system, we can wave a
+magic wand over it and convert it to a differential equation for
+representing the rate of change in number of recovered entities:
+</p>
+<p>
+<code><sup>dR</sup>/<sub>dt</sub> = PI(<sup>R</sup>/<sub>N</sub>)</code>
+</p>
+<p>
+The change in number of infected entities has a similarity to the
+SIS model: <code>PI</code> constitutes the number of infectious probes
+that hit an entity in the address space of the simulation. Since only
+a fraction of the number of entities that get hit are susceptible,
+the change in number of infected entities due to conversion of
+susceptible entities
+amounts to <code>PI(<sup>S</sup>/<sub>N</sub>)</code>
+</p>
+<p>
+This SIR model differs from the SIS model in that some infected
+entities change to recovered. That change amounts to
+<code>-PI(<sup>R</sup>/<sub>N</sub>)</code>.
+</p>
+<p>
+We add the two changes in number of infected entities, and once
+again invoke the magic of continuous time and a large population to
+get a differential equation:
+</p>
+<p>
+<code><sup>dI</sup>/<sub>dt</sub> = PI(<sup>S</sup>/<sub>N</sub>) - PI(<sup>R</sup>/<sub>N</sub>)</code>
+</p>
+<p>
+That leaves us with <a name="CRCLEANDE">three equations</a> for the three unknowns
+(<code>S</code>, <code>I</code>, <code>R</code>):
+</p>
+<ul>
+<li><code>N</code> = <code>S</code> + <code>I</code> + <code>R</code></li>
+<li><code><sup>dR</sup>/<sub>dt</sub> = PI(<sup>R</sup>/<sub>N</sub>)</code></li>
+<li><code><sup>dI</sup>/<sub>dt</sub> = PI(<sup>S</sup>/<sub>N</sub>) - PI(<sup>R</sup>/<sub>N</sub>)</code></li>
+</ul>
+<h4>Euler's Method.</h4>
+<p>
+I don't think that an analytical solution for the three equations
+above exists. One can write a numerical simulation for them, however.
+Assuming  differentials constitute ratios of finite quantities and
+that using small (but not infinitesimal) values of <code>dt</code>
+approximates the analytical solution, you can write an iterative
+solution.
+</p>
+<ul>
+<li><code>
+R<sub>i+1</sub> = R<sub>i</sub> + (PI<sub>i</sub>R<sub>i</sub>/N)&Delta;t
+</code></li>
+<li><code>
+I<sub>i+1</sub> = I<sub>i</sub> + (PI<sub>i</sub>S<sub>i</sub>/N - PI<sub>i</sub>R<sub>i</sub>/N)&Delta;t
+</code></li>
+<li><code>S<sub>i+1</sub> = N - I<sub>i+1</sub> - R<sub>i+1</sub></code></li>
+</ul>
+<p>
+The values of <code>S</code>, <code>I</code> and <code>R</code>
+at a given time step get used to calculate the values for the next time step.
+</p>
+<h4>Simulation Description</h4>
+<p>
+To compare the NWS simulator with an Euler' method solution for an SIR epidemic,
+I wrote and ran an NWS simulation of CRclean versus Code Red.
+I used an address space of 65535 (16 bits), and I populated it with seven
+<code>NWS::Host</code> instances that run NWS worm code, modeling the start
+of the Code Red 1 v2 worm.
+I put in 9986 possible victim <code>NWS::Host</code> instances, modeling
+IIS hosts, all of them infectable by Code Red v2.
+All worms and victims reside at randomly assigned addresses.
+</p>
+<p>
+To make this simulation different from the SIS model above, I put in seven
+<code>NWS::Host</code> instances that contain code for a simulated CRclean worm.
+This differs from reality. To my knowledge, no one deployed CRclean.
+</p>
+<p>
+I used seven each of Code Red 1 v2 and CRclean to give the simulated
+Code Red worms a good probability of hitting a simulated IIS host during
+early time steps.  This should reduce the differences between the Euler's
+Method numerical simulation and the NWS simulation.
+</p>
+<p>
+The Euler's method numerical simulation starts with <code>N = 65535</code>,
+<code>S = 9986</code>, <code>I = 7</code> and <code>R = 7</code>.
+It sets the probability of picking a host at random to <code>P = 10000/65535</code>.
+It runs for 150 time steps.
+</p>
+<center><img src="euler.png" alt="SIR model results" /></center>
+<p>
+The NWS simulation of CRclean matches the Euler's Method numerical
+solution very closely, far closer that the NWS SIS simulation matches
+an Euler's method numerical simulation.
+I believe this results from the fact that a  single
+differential equation can describe an SIS epidemic, while an SIR epidemic
+requires a system of three differential equations.
+An NWS simulation of an SIS epidemic "leaks" relative to the Euler's
+Method solution, in that NWS can't infect fractional numbers of entities.
+Any time the Euler's Method simulation infects something other than a whole
+number of entities, at the corresponding time step the NWS simulator only
+infects the whole number of entities.  Any fractional number of infected
+entities leaks out of the system, since the fractional part gets added
+to no other quantity. The three equations used to model an SIR epidemic
+don't "leak" fractional parts of entities out of the system: any fraction
+of an entity not included in one quantity gets included in another.
+</p>
+<h4>CRclean conclusions</h4>
+<p>
+It looks like CRclean would have worked against Code Red, despite not doing
+any scanning on its own.
+More generally, it looks like a "passive" worm, a worm that merely
+responds to legitimate requests, instead of actively scanning for
+vulnerable hosts, would work, provided the population of vulnerable hosts
+act as clients to the passive worm's service.
+</p>
+<h3>Competing Worms</h3>
+<p>
+Two <a href="http://www.caida.org/analysis/security/code-red/">Code Red worms</a><sup><a href="#B25">[25]</a></sup>
+existed and competed for the same set of vulnerable Windows hosts running IIS.
+For a period in August and September of 2001, Code Red II out-infected
+Code Red V2.
+In this section, I use NWS to explore some possibilities of why one worm
+might out-compete another worm for the same population of infectable entities.
+</p>
+<p>
+The case of two or more worms that use the same
+exploit has happened in the real Internet at least
+twice.  Code Red I v2 and Code Red II in 2001, and the many
+<a href="http://isc.incidents.org/analysis.html?id=177">"Slapper" variants</a><sup><a href="#B32">[32]</a></sup>
+in 2003.
+</p>
+<p>
+I won't address the different probing strategies used by 
+Code Red I v2 and Code Red II - the NWS framework does not currently
+allow simulating sub-nets, so simulating Code Red II's preference for
+probing IP addresses close to its own doesn't make any sense.
+Some other properties can be addressed.
+</p>
+<h4>Variation in probe rates</h4>
+<a href="wormfight2.pl">Simulation code</a>
+<p>
+This set of simulations has an address space of size 65535,
+in which seven each of two, very similar worms get started.
+The simulation also contains 10,000 infectable hosts.
+For verisimilitude, I named the worms "Code Red I v2" and "Code Red II",
+and I named the susceptible hosts "IIS".
+</p>
+<p>
+The simulation executes two very similar worms.
+The worms carry nearly
+identical code, differing in only two aspects.
+The "true name" that each worm gives
+to a newly-infected host differs, one set of worms uses "Code Red I v2",
+the second set uses "Code Red II".
+The two worms also differ in that "Code Red II" worms can send
+an extra probe to a random address some percentage of the time steps
+in which they execute. 
+The "Code Red II" worm code uses a random number to decide whether
+to send the extra probe, so the percentage works out only on an aggregate
+basis - some worm instances may never send the extra probe, some instances
+may send it every time step.
+This extra probe simulates a slightly faster worm or
+a worm that communicates infection slightly faster.
+</p>
+<p>
+I ran the simulation 20 times each with an extra-probe-percentage of
+0, 1, 5 and 10.  The following table show the mean number of infected hosts
+for each of the extra-probe-percentages.
+</p>
+<table border="1">
+	<tr>
+		<th></th>
+		<th>0%</th>
+		<th>1%</th>
+		<th>5%</th>
+		<th>10%</th>
+	</tr>
+	<tr>
+		<td>Code Red I v2</td>
+		<td>5061.9</td>
+		<td>4408.95</td>
+		<td>2726.35</td>
+		<td>1273.5</td>
+	</tr>
+	<tr>
+		<td>Code Red II</td>
+		<td>4951.1</td>
+		<td>5604.05</td>
+		<td>7286.65</td>
+		<td>8739.5</td>
+	</tr>
+</table>
+<p>
+Even a small increase in number of probes per time step
+gives a population of worms a big advantage against a slightly
+slower population.
+</p>
+<h4>One worm fixes vulnerability</h4>
+<a href="wormfight3.pl">Simulation code</a>
+<p>
+In this variant, "Code Red II" worm code marks its
+host as not vulnerable just after exploiting that host.
+This action prevents re-infection from other "Code Red II"
+hosts, and conversion to "Code Red 1 v2".
+</p>
+<p>
+Worms with the true name "Code Red 1 v2" don't perform the extra
+work of marking the newly-infected <code>NWS::Software</code>
+instance not vulnerable.  Other "Code Red 1 v2" worms can
+re-infect it, and "Code Red II" can infect it.
+</p>
+<p>
+Both worms probe at the same rate, once per time step.
+</p>
+<p>
+The simulation has an address space of 65535. I had the simulation
+place 10000 victim hosts randomly in the address space. 
+I had the victim hosts contain <code>NWS::Software</code> instances
+using the identifier and true name of "IIS".
+At the top
+end of the address space (address 65525) I had the simulation place
+an <code>NWS::Host</code> instance containing worm code that upon
+infection, "fixes" the vulnerability it used to replicate itself.
+I had this worm use the true name of "Code Red II".
+</p>
+<p>
+At the bottom end of the address space (address 10) I had the
+simulation place <code>NWS::Host</code> instance containing worm code
+identical to the first worm code, except that it doesn't fix the
+vulnerability.  Instances of this worm leave the vulnerability
+unpatched.
+I had this worm use the true name of "Code Red I v2".
+</p>
+<p>
+I ran the simulation 20 times, each time executing 100 time steps,
+producing the data in the table below.
+</p>
+<table border="1">
+<tr>
+	<th>Worm true name</th>
+	<th>mean hosts infected per run</th>
+	<th>median hosts infected per run</th>
+</tr>
+<tr>
+	<td>Code Red I v2</td>
+	<td>64.1</td>
+	<td>35</td>
+</tr>
+<tr>
+	<td>Code Red II</td>
+	<td>9888.8</td>
+	<td>9918</td>
+</tr>
+</table>
+<p>
+Fixing the vulnerability that initially gave access to the susceptible host 
+confers an enormous advantage on a population of worms competing for a
+set of susceptible hosts that exhibit a given vulnerability.
+</p>
+<h4>Competing Worms Conclusions</h4>
+<p>
+For the case of two worms competing for the same population of
+susceptible hosts,
+worm authors should strive to write worms as "virulent" as possible.
+</p>
+<p>
+Worms should patch the vulnerability they used to replicate themselves.
+It appears that all other things staying the same, having a worm
+fix the vulnerability it exploited to replicate gives more
+advantage than a 10% performance boost.
+</p>
+<h3><a name="PERMUTATION">Permutation Scanning worm</a></h3>
+<a href="permutation.pl">Permutation scanner simulator code</a><br/>
+<a href="Permutation.pm">Algorithmic permutation code</a>
+<p>
+This simulation models the hypothetical Permutation scanning worm
+described in
+<a href="http://www.icir.org/vern/papers/cdc-usenix-sec02/">How to 0wn the Internet in your spare time</a><sup><a href="#B10">[10]</a></sup>,
+in a section titled &quot;Permutation Scanning&quot;. Staniford, Paxson
+and Weaver 
+wrote about a simulation of a permutation scanning worm, but I believe they
+missed some key points, developed below.
+</p>
+<p>
+Permutation scanning worms don't select addresses to probe randomly:
+they select addresses algorithmically.  Each worm has an index,
+and an algorithm
+that maps the index value to an address. By incrementing the index, they
+calculate different, non-sequential addresses to probe.  If the worms
+use a good quality algorithm to calculate address, the addresses
+generated from successive indexes are quite different: the series of
+addresses probed looks very close to random.  All worms use the same
+algorithm to generate addresses, but individual worms pick random
+initial index values at infection time.
+</p>
+<p>
+A worm that starts late will likely pick an index in a range
+that an earlier worm has already probed. The late-created-worm will
+end up probing a series of addresses that some other worm has already probed.
+To avoid re-probing, worms that try to re-infect previously infected hosts
+go inactive in
+the Staniford/Paxson/Weaver scenario.
+The worm code in the permutation scanning simulation accomplishes
+this by replying to any re-infection attempts.  Individual re-infecting
+worm instances go inactive when they receive a reply.
+</p>
+<p>
+One can spoof worms that use this type of scanning.  An immune
+spoofer host could respond that the
+worm has already infected it, causing permutation scanning
+worms that probe the spoofer to go inactive. This would
+protect all hosts further in the permutation
+than the spoofing host.  Real life worms should require two or more consecutive
+&quot;already infected&quot; replies to go inactive to prevent spoofing.
+The simulated worm represents the best case of a permutation scanner,
+with respect to optimism about reinfection.
+</p>
+<p>
+The permutation scanning worm of this simulation uses an algorithmic
+permutation to probe address space.
+A DES-inspired algorithm combines a 32-bit key with a 16-bit
+index to determine the address to probe.  Worms start with a random index,
+then generate an address to probe by using the
+permutation function on the index. Worms increase the index sequentially.
+Hopefully, the series of addresses calculated by permuting sequential indexes
+look random.
+All worms use the same permutation by using the same 32-bit key.
+</p>
+<p>
+The simulation runs in an  address space of size 65535 (16 bits).
+It starts with 7 permutation scanning worm and 9993 victims.
+The victim <code>NWS::Host</code> instances reside at randomly assigned addresses, as does the
+single initial worm instance.
+The simulation runs for 135 time steps or until only 1% of
+the 9993 possible victims remain uninfected.
+This allows for comparison to the <a href="#SIS">SIS model</a> random probing
+worm described above.  I ran the permutation scanning worm simulation
+20 times, and calculated mean counts of infected
+hosts at every fifth time step, shown in the graph below.
+</p>
+<center><img src="rand.perm.png" alt="Random probing vs Permutation scanning" /></center>
+<p>
+Permutation scanning worms and random probing worms take
+exactly the same number of time steps to reach 100% infection.
+</p>
+<!--
+Might be an artifact of giving NWS::Host instances random addresses inside
+the 16-bit address space.
+The real internet doesn't have a random distribution of hosts
+over the 32-bit address space.
+ a href="http://www.caida.org/outreach/resources/learn/ipv4space/" This 1997 study</a>
+demonstrates that hosts get clustered.  If you zoom in on the &quot;Class B&quot;
+addresses, you can see 16 horizontal bands.  Clearly, the humans that allocate
+hosts to addresses start at small numbers in the dotted-quad IP address
+notation, and assign sequentially upwards.
+-->
+<p>
+Permutation scanning produces fewer messages to get to 100% infection
+than a population of random probing worms does, and a smaller mean
+number of probes per host.
+Only active permutation scanning worms send messages, and the proportion
+of active permutation scanning worms rises, then drops to nearly zero
+by 100% infection. To contrast, every member a population of random probing
+worms produces messages all through the course of a simulation.
+</p>
+<p>
+One area of difference exists: the distribution of probes over the
+population of entities in the simulation.
+When you count the probes per host, the population of permutation scanning
+worms produces a Zipfian distribution - almost 45% of the hosts in the
+simulation receive 2 probes, abut 26% receive 3 probes, 13% receive 4 probes
+and so on.  The number of hosts receiving a certain number of probes amounts
+to almost exactly half the number of hosts that receive one more probe.
+The typical host receives far fewer scans for the optimistic permutation scanning worm,
+than for a random scanning worm.
+</p>
+<p>
+The random probing worms produce a Poisson distribution of probes per host,
+exactly what you'd expect for a random process.
+</p>
+<p>
+The property of not probing most hosts very often
+might  make discerning a permutation scanning worm more difficult,
+</p>
+<center><img src="histogram.png" alt="Random probes and permutation probes histogram" /></center>
+<h4>Permutation scanning simulation conclusions</h4>
+<p>
+I conclude that permutation scanning doesn't give a worm
+an overall advantage relative to random probing.
+A permutation scanning worm doesn't have any speed to 100%-infected advantage.
+It has a lot of disadvantages.
+I found it difficult to write an algorithmic permutation of a 16-bit
+address space that gives a random look to the permuted indexes.
+Depending on the vulnerability and the communication protocol involved,
+firewalls or NAT can prevent infected hosts from responding to repeat
+infection attempts, negating any advantage conferred by lowering traffic -
+worms that should go inactive instead keep probing.
+Permutation scanning has trouble with NAT-ed subnets, too. Since a given
+set of worms all use the same permutation, a worm instance that obtains
+access to a NAT-ed subnet host will almost certainly skip over most or
+all of the other hosts on the NAT-ed subnet, at least until an address in
+the subnet turns up as a permuted index.
+I conclude that the Internet will probably never see a permutation
+scanning worm that becomes epidemic.
+</p>
+<h3>Cheese vs 1i0n</h3>
+<p>
+The <a href="http://www.whitehats.com/library/worms/lion/index.html">1i0n</a><sup><a href="#B33">[33]</a></sup>
+Linux worm of 2001 prompted someone to write an anti-worm:
+<a href="http://www.cert.org/incident_notes/IN-2001-05.html">Cheese</a><sup><a href="#B34">[34]</a></sup>.
+Beyond obvious differences like CRclean attacking IIS and
+Cheese exploiting a back door TCP server left behind by the 1i0n worm, 
+significant differences exist between them.
+One significant difference between Cheese and CRclean consists
+of the method of finding hosts infected with the original worm.
+Cheese actively sought out back door TCP servers
+left running by 1i0n worms. CRclean waits for a Code Red URI to
+arrive, and attempts to infect the sender of the Code Red URI.
+Does active searching for hosts infected by some other worm make a difference?
+</p>
+<p>
+The same differential equations as describe the <a href="#SIR">CRclean model</a>
+apply here.  The derivation of the differential equations ends up
+with different semantics for the change in recovered entities equation.
+The Cheese worm actively probed for 1i0n back door servers. The probability
+of a Cheese worm probing an address
+that maps to a host remains <code>P</code>, but the
+number of Cheese worms is <code>I</code>, and the fraction of the population
+infected with 1i0n is <code><sup>I</sup>/<sub>N</sub></code>. For Cheese, the
+differential equation for change in number of recovered entities is:
+</p>
+<p>
+<code><sup>dR</sup>/<sub>dt</sub> = PR(<sup>I</sup>/<sub>N</sub>)</code>
+</p>
+<p>
+The <code>PRI/N</code> term equates algebraically to the <code>PIR/N</code>
+in the <a href="#CRCLEANDE">CRclean system of differential equations</a>.
+The same numerical simulation can describe both CRclean/Code Red/IIS
+interaction and the Cheese/1i0n/BIND interaction.
+The differential equations give the insight that CRclean and Cheese
+should observe fundamentally similar limits on spreading.
+</p>
+<h4>Simulation Description</h4>
+<p>
+I used an address space of 65535 (16 bits), and I populated it with seven
+worm <code>NWS::Host</code> instances containing code representing the
+initial number of  1i0n worms.
+I also populated the address space with seven <code>NWS::Host</code>
+instances containing code representing an initial number of Cheese worms.
+I put in 9986 possible victim <code>NWS::Host</code> instances modeling hosts
+running BIND, the software exploited by 1i0n worms.
+All <code>NWS::Host</code> instances reside at randomly assigned addresses
+in the simulation's address space.
+</p>
+<p>
+For validation purposes, the simulation runs for 150 time steps and all 
+Cheese worms and 1i0n worms get their start at time step 1.
+</p>
+<center><img src="cheese.comparison.png" alt="Cheese worm simulation compared with Euler's method" /></center>
+<p>
+This Cheese worm simulation matches the Euler's method numerical solution
+about as well as the CRclean worm simulation did.
+</p>
+<h4>Network Traffic Comparison</h4>
+<p>
+The set of Cheese worms send out many more probes than the
+set of CRclean worms.
+CRclean worms only respond to Code Red probes, while Cheese worms actively
+probe for 1i0n back door software.  The set of CRclean worms produces
+fewer and fewer response messages as the number of Code Red worms decreases, while
+the set of Cheese worms produce more and more probe messages
+as their population increases.
+</p>
+<h4>Cheese Simulation Conclusions</h4>
+<p>
+If you must write an anti-worm, write it in the "passive" style of CRclean,
+rather than the "active" style of Cheese.
+Passive worms produce less network traffic of their own.
+</p>
+<h3>msblast - effect of banded address space</h3>
+<a href="msblast.pl">msblast simulator code</a><br/>
+<a href="generic.pl">Random probing worm simulator code</a>
+<p>
+The <a href="http://www.cert.org/advisories/CA-2003-20.html">msblast</a><sup><a href="#B35">[35]</a></sup> worm appeared in August of 2003.
+It took advantage of a buffer overflow in an RPC system 
+that apparently existed in
+nearly every Windows NT-based operating system.
+</p>
+<p>
+The msblast worm had an
+<a href="http://lists.insecure.org/lists/vuln-dev/2003/Aug/att-0029/RPC_DCOM_recode_and_analysis.TXT">unusual method</a><sup><a href="#B36">[36]</a></sup>
+for picking addresses to
+probe for susceptible hosts: each worm picked a random IP address upon
+infecting a host, then sent probes sequentially up from the random address.
+</p>
+<p>
+Given that network administrators have allocated addresses inside the Internet
+Protocol address space in <a href="http://www.caida.org/outreach/resources/learn/ipv4space/">bands</a><sup><a href="#B37">[37]</a></sup>,
+perhaps the author of msblast thought that sequential probing would allow
+faster infection rates.  I wrote an NWS simulation to test 
+msblast's probing strategy against
+victim hosts placed in bands in the address space, 
+and against victim hosts placed randomly throughout the address space.
+</p>
+<h4>Simulation Description</h4>
+<p>
+The real question amounts to "what difference does an address probing
+strategy make if the addresses of susceptible hosts are arranged 
+in groups rather than scattered randomly?"
+To test this, I wrote 4 different simulations:
+</p>
+<ul>
+<li>Random address probing worm, victims placed randomly</li>
+<li>Random address probing worm, victims placed in bands</li>
+<li>msblast-style probing worm, victims placed randomly</li>
+<li>msblast-style probing worm, victims placed in bands</li>
+</ul>
+<p>
+In each of the four simulations,
+I used an address space of 65535 (16 bits of address), and I populated
+it with seven 
+worm <code>NWS::Host</code> instance, and 9993 possible victim
+<code>NWS::Host</code> instances,
+for a total of 10000 entities in the population.
+In all four simulations, the initial seven worm entities get
+randomly selected addresses.
+</p>
+<p>
+In two of the simulations, the victims also get randomly
+selected addresses.  In the other two simulations, the victims
+get placed sequentially in nine "bands", all bands one-ninth of
+the address space apart.  Each band contains one-ninth of the
+victim hosts.
+</p>
+<p>
+For one simulation each of random and banded placement of victim hosts,
+I modeled a random address probing worm, like
+Code Red v2, or Slapper.
+Each time it gets executed, a random address probing worm picks 
+an address in the simulation's address space at random. It tries to
+infect that address.
+</p>
+<p>
+In the second set of two simulations (banded placement of
+victims and random placement of victims), I modeled the msblast worm.
+The msblast worm code picks an address at random when it infects
+a previously susceptible host.  Each time the worm code executes
+after that, it probes the address, then increments the address.
+Written an alternate way, it probes sequentially up the address space.
+I had the code wrap around to address 1 if and when it gets to
+the maximum address in the simulation.
+</p>
+<p>
+The four simulations run for 135 time steps or until only 1% of
+the 9993 possible victims remain uninfected.
+</p>
+<p>
+I ran the simulations 20 times each.
+I reduced the 20 simulation outputs to an arithmetic mean of
+the number of infected hosts at each time step.
+The graph below compares the mean of 20 simulation runs
+for each of the four simulations
+</p>
+<center><img src="msblast.png" alt="msblast model results"/></center>
+<h4>msblast probing conclusions</h4>
+<p>
+A worm that probes an address space randomly reaches 100% infection
+just as fast for both victim host layouts, random and banded.
+The msblast-style probing worm performed differently for the
+two victim host layouts.
+</p>
+<p>
+For a set of victims with randomly-allocated addresses, the random probing
+worm dramatically outperforms msblast-style sequential probing.
+</p>
+<p>
+For a set of victims in nine bands, the random probing worm performs
+identically to the random probing worm with a set of randomly positioned
+victims.  The msblast-style sequential probing performed almost as well.
+</p>
+<p>
+I hypothesize that the author of the real msblast had access to a network
+with sequentially-allocated addresses for testing.  The sequential probing
+msblast worm worked fairly well on the network used for testing,
+maybe even better than random probing, so the msblast author 
+chose an address selection algorithm that didn't work very well
+in the real Internet.
+<!-- Typical windows programmer. Never test generally enough. -->
+</p>
+<p>
+I made the choice of nine bands fairly arbitrarily.  Some possibility
+exists that more or fewer bands, or even a more densely-populated
+address space make the msblast address selection algorithm more
+efficient than random probing.
+</p>
+<h2>Programming guide</h2>
+<h3>Installation</h3>
+<p>
+I assume that users of NWS will make modifications to the library
+modules that implement the NWS framework.  It seems useless to
+install NWS as an official Perl module when the users will almost
+certainly have customized copies of the NWS modules
+in the directories of specific simulations.
+</p>
+<p>
+To install NWS, you create a directory into which you unpack the
+<a href="nws.tar.gz">distribution</a> with a command
+similar to <code>gunzip -c nws.tar.gz | tar xf -</code>.
+All the example simulations from this document unpack as well.
+Every example simulation gains the use of the NWS framework
+by including four Perl "use" directives:
+</p>
+<pre><code>
+use NWS::Network;
+use NWS::Message;
+use NWS::Host;
+use NWS::Software;
+</code></pre>
+<p>
+If you create your own simulation, include the same four Perl "use"
+statements.
+</p>
+<p>
+This boils down to having a directory named <code>NWS</code>
+located in the directory in which simulation code resides.
+The <code>NWS</code> subdirectory must contain the four Perl modules
+(<code>Network.pm</code>, <code>Message.pm</code>, <code>Host.pm</code>, <code>Software.pm</code>)
+that implement the NWS framework.
+</p>
+<h3>Simple Worm Example</h3>
+<a href="simple.pl">Simple worm code</a>
+<p>
+An example of a very simple worm will help the reader understand
+the NWS simulator.
+The following 28 lines of Perl illustrate how to write a simulator for
+a simple <a href="#SIS">Susceptible-Infected-Susceptible</a> model.
+</p>
+<pre><code>
+     1	#!/usr/bin/perl
+     2	use NWS::Network;
+     3	use NWS::Message;
+     4	use NWS::Host;
+     5	use NWS::Software;
+     6	
+     <a name="L7">7</a>	my $worm_code = q{
+     <a name="L8">8</a>		my ($host, $software, $phase) = @_;
+     <a name="L9">9</a>		$host-&gt;SendMsg(
+    10			Message->new(
+    <a name="L11">11</a>				$host-&gt;RandAddress,
+    <a name="L12">12</a>				'OS-CPU',
+    <a name="L13">13</a>				'Victim',
+    14				$software-&gt;{code})
+    <a name="L15">15</a>		) if $phase == $Host::Run;
+    <a name="L16">16</a>		$software->{true_name} = 'Worm' if $phase == $Host::Init2;
+    17	};
+    18	
+    <a name="L19">19</a>	my $network = Network-&gt;new(65535, 0);
+    <a name="L20">20</a>	$network->AddHost(Host-&gt;new('OS-CPU', 0, Software->new('Worm', $worm_code, 0)));
+    21	$network->AddHost(Host->new('OS-CPU', 0, Software-&gt;new('Victim', '', 1)))
+    22		for (1..10000);
+    23	
+    <a name="L24">24</a>	for (my $i = 1; $i &lt; 135; $i += 5) {
+    25		$network->Run($i, 5)-&gt;PrintCounts;
+    26	}
+    27	
+    28	exit 0;
+</code></pre>
+<ul>
+<li><a href="#L7">lines 7-17</a> show that a working worm doesn't need a lot of code. Note that the worm code does
+two different things, <a href="#L9">attempting to replicate itself</a> at a random network address if called with
+the <code>$Host::Run</code> code,
+and <a href="#L16">setting the NWS::Software's &quot;true name&quot; to "Worm"</a>
+if called with the <code>$Host::Init2</code> code.
+</li>
+<li><a href="#L8">line 8</a> shows what arguments get passed to worm code
+when it executes: the instances of <code><a href="#HOST">NWS::Host</a></code> and
+<code><a href="#SOFTWARE">NWS::Software</a></code> that provide a context for the code to
+execute in, and a numeric indication of what "phase" the worm
+got called during.
+</li>
+<li><a href="#L11">line 11</a> sets the destination address of the
+<code><a href="#MESSAGE">NWS::Message</a></code>
+object created on lines 10-14.  The
+<code><a href="#RANDADDRESS">Host::RandAddress</a></code> method
+returns a random address in the address space of the
+<code><a href="#NETWORK">NWS::Network</a></code>
+containing the <code>Host</code> instance.
+</li>
+<li><a href="#L12">line 12</a> sets the <code>Message</code> object's
+<code>identifier</code> instance variable to the value "OS-CPU".
+<code>Host</code> instances will ignore <code>Message</code> objects
+sent to them that do not possess an <code>identifier</code> that
+matches their own <code>identifier</code>.
+</li>
+<li><a href="#L13">line 13</a> sets the <code>Message</code> object's
+<code>software</code> instance variable to "Victim".
+When a <code>Host</code> instance accepts a <code>Message</code>
+based on matching <code>identifier</code> instance variable
+values, the <code>Host</code> tries to find an instance of
+<code>Software</code> based on the value of the <code>Message's</code>
+<code>software</code> instance variable.
+</li>
+<li><a href="#L16">line 16</a> sets the <a href="#TRUENAME">&quot;true name&quot;</a> of the newly infected
+<code>NWS::Software</code> instance to &quot;Aworm&quot;.
+Every instance of class <code>NWS::Software</code> has an <a href="#IDENTIFIER">identifier</a>
+and a <a href="#TRUENAME">true name</a>. This allows the worm to infect 
+<code>Software</code> instances based on
+identifier, and it allows a simulation to report on infections by true name.
+It also illustrates a difficult real world problem: how does one name
+what Code Red does to an IIS process? A Code-Red-infected-IIS still
+contains (if not executes) IIS code.
+</li>
+<li><a href="#L19">line 19</a> creates and initializes the
+<code><a href="#NETWORK">NWS::Network</a></code> object.
+The <code>NWS::Network</code> object
+connects all the instances of class <code>NWS::Host</code> that take part in the simulation, and does
+the work of passing messages between <code>NWS::Host</code> instances. This simulation gives this Network object a 16-bit address space,
+and lets the <code>NWS::Network</code> code choose a seed value for the random number generator.
+</li>
+<li><a href="#L20">lines 20-22</a> illustrate how to stock an <code>NWS::Network</code> object
+with <code>NWS::Host</code> objects. The 9999 &quot;victim&quot; <code>Host</code>
+instances each contain
+an instance of class <code>Software</code> with a name that the worm code knows.
+The &quot;victim&quot; software
+gets marked vulnerable.
+</li>
+<li><a href="#L24">lines 24-26</a> run the simulator for 135 timestamps, printing counts of the <code>NWS::Software</code>
+instances contained in
+the simulation's collection of <code>NWS::Host</code> instances every 5 time steps.
+The simulation calls <code><a href="#PRINTCOUNTS">NWS::Network::PrintCounts</a></code>
+method to do the output.
+</li>
+</ul>
+<h4><a name="OUTPUT">Simple worm output</a></h4>
+<p>
+When invoked from a Linux command line prompt, the simple worm simulator produces output
+that looks like this:
+</p>
+<pre><code>
+ 4:16PM 642 % ./simple.pl
+#step, msg count,       Victim, Worm
+5       9       9999    2
+#step, msg count,       Victim, Worm
+10      10      9999    2
+#step, msg count,       Victim, Worm
+15      15      9998    3
+#step, msg count,       Victim, Worm
+20      23      9994    7
+#step, msg count,       Victim, Worm
+25      52      9989    12
+</code></pre>
+<p>
+The <code>NWS::Network::PrintCounts</code> method produces two lines of output each time
+that a program calls it.
+The first line begins with the '#' (pound sign) character, and lists the
+last time step number, the number of messages sent since the last call
+to <code>NWS::Network::PrintCounts</code>,
+followed by true names of the <code>NWS::Software</code> instances in the simulation.
+</p>
+<p>
+The second line contains a tab-separated list of numbers, counts
+of the same true names of <code>NWS::Software</code> instances that appear on
+the first line.
+</p>
+<p>
+This output format served me well, allowing interactive and batch
+graphing using <a href="http://www.gnuplot.info/">Gnuplot</a>.
+It may not serve others as well.  <code>NWS::Network::PrintCounts</code> does
+not use any information other than that contained in <code>NWS::Network</code>
+instance variables, so any NWS user can re-write <code>PrintCounts</code> to
+suit him or her self.
+</p>
+<h3>Classes</h3>
+<h4><a name="NETWORK">NWS::Network</a></h4>
+<p>
+Instances of <code>NWS::Network</code> model all the wiring and routers and gateways
+that compose a single real network.
+</p>
+<p>
+A program using the NWS simulation framework should only bother to create a single instance
+of class <code>NWS::Network</code>. The instance of Network contains and connects instances
+of class Host. The Network instance calls <code>NWS::Host::RunProcess</code> method on each
+contained instance of <code>NWS::Host</code>, which can cause a <code>NWS::Host</code> to send a <code>NWS::Message</code> instance to
+some other <code>NWS::Host</code> contained by the <code>NWS::Network</code> instance.  <code>NWS::Network</code> instances
+deliver <code>NWS::Message</code> instances around the simulated network.
+</p>
+<h5>NWS::Network Methods</h5>
+<ul>
+<li>Constructor: <code>new NWS::Network $address_space <em>$seed</em></code><br/>
+You must pass in the size of the address space you want to use.
+The value of the <code>$address_space</code> argument should amount
+to the largest
+address in the simulation.  If you don't pass in a seed for the random
+number generator, The <code>NWS::Network</code> constructor will choose
+one for you.  Passing in a particular seed allows you to re-run a simulation
+to see if you get identical results.<br/>
+Example use:
+<pre><code>	my $network = new NWS::Network 10000;</code></pre>
+The above Perl fragment creates an <code>NWS::Network</code> instance
+that allows a maximum address of 10000, and seeds the simulation's random
+number generator with a value of its own making.
+</li>
+<li><code>GetSeed</code>: returns the number used as the seed of the random number generator.
+Example use:<br/>
+<pre><code>	print "Simulation's PRNG seed: ", $network->GetSeed, "\n";</code></pre>
+</li>
+<li><code>AddHost</code>: add an <code>NWS::Host</code> entity to the network.
+Gives the <code>Host</code> an address if it doesn't already have one
+(<code>NWS::Host::address</code> evaluates to 0 or undefined).  Will not put
+a <code>Host</code> at address zero. Will not give two <code>Host</code> instances
+the same address if it picks the addresses. By way of an example:<br/>
+<pre><code>
+	my $host = new Host 'Solaris-SPARC', 0;
+	$host->AddSoftware(new Software, 'snmpXdmid', '', 1);
+	my $address = $network->AddHost($host);
+	print "Host added at address ", $address, "\n";
+</code></pre>
+The example creates an <code>NWS::Host</code> instance with
+vulnerable software, and an address of zero.  Inserting
+<code>$host</code> into the <code>NWS::Network</code> will cause
+<code>$network</code> to select a random address in its address
+space for <code>$host</code>.
+<code>AddHost</code> returns the numerical address at which it
+placed the <code>Host</code>. This allows the NWS user to place victims
+randomly in a simulation's address space, and still build up a "hit list"
+for the initial worm instance.
+</li>
+<li><code>Run</code>: execute the simulation.  Call this on an <code>NWS::Network</code>
+instance after you've added hosts and performed any other setup. <code>Run</code>
+takes two scalar arguments: the time step it should start counting from,
+and a number of time steps to execute before returning.  
+The internal state of any give <code>Network</code> instance stays constant
+between calls to <code>Run</code> unless a user's simulation code changes it.
+Numbering time steps is just a convenience to the user.
+Returns a reference
+to the <code>NWS::Network</code> instance on which you call it.
+<pre><code>
+	for (my $i = 1; $i &lt; 100; $i += 5 ) {
+		$network-&gt;Run($i, 5)-&gt;PrintCounts;
+	}
+</code></pre>
+The above code fragment executes 100 time steps on the contents of
+<code>$network</code>, 5 steps at a time. After each 5 time steps,
+the example executes <code>PrintCounts</code> on <code>$network</code>. 
+If you only care about end results of a simulation, you can have
+all time steps executed without interruption:
+<pre><code>
+	$network->Run(1, 100);
+</code></pre>
+</li>
+<li><code><a name="PRINTCOUNTS">PrintCounts</a></code>:
+Each call to this method <a href="#OUTPUT">prints two newline-terminated lines</a>
+of text to STDOUT.
+The first line begins with an octothorpe ('<code>#</code>')
+character, and contains tab-separated column names.
+The second line contains the numeric values of the
+columns named in the first line.  Each second line contains
+time step number and a count of all <code>Message</code> objects
+sent since the last call to <code>PrintCounts</code>.
+Each second line also contains a count of the number
+of <code>Software</code> instances present in the
+<code>Network</code> when <code>PrintCounts</code> executes.
+The <code>Software</code> instance counts go by the value
+of the <code><a href="#TRUENAME">true_name</a></code>
+instance variable.
+</li>
+</ul>
+<p>
+Letting the <code>AddHost</code> method prefer to place entities at
+random addresses in a simulation's address space may constitute a flaw.
+This preference may lead NWS users to assume that the real Internet,
+or even a corporate intranet, has a randomly-addressed population.
+Simulations that don't match reality closely may result.
+</p>
+<h5>NWS::Network Instance variables</h5>
+<ul>
+<li>
+<code>hosts</code>: a hash of <code>NWS::Host</code> instances, keyed by
+numeric address.
+<pre><code>
+	foreach my $h (values %{$network->{hosts}}) {
+		print "Host at", $h->{address}, " received ",
+			$h->{msg_cnt}->{rcvd}, " total probes\n";
+	}
+</code></pre>
+The above example enumerates all <code>NWS::Host</code> instances
+contained in <code>$network</code>.
+</li>
+<li>
+<code>total_msg_count</code>: a scalar count of how many <code>NWS::Message</code>
+objects have been sent so far.
+</li>
+<li>
+<code>total_hit_count</code>: a scalar count of how many <code>NWS::Message</code>
+objects have been delivered to <code>NWS::Host</code> instances.
+Use <code><a href="#MSG_CNT">Host::msg_cnt</a></code> instance variable
+to obtain a per-host
+count of messages that got delivered and learn how the host accepted them.
+</li>
+</ul>
+<p>
+The last two instance variables mainly have use in determining if
+a given simulation correctly sends and receives enough messages.
+For example, over a large enough number of time steps, randomly
+addressed messages should hit enough hosts to make
+the ratio of <code>total_hit_count</code> to <code>total_msg_count</code> equal the ratio of
+number of hosts to address space size.
+</p>
+<h4><a name="HOST">NWS::Host</a></h4>
+<p>
+Instances of class <code>NWS::Host</code> represent computers attached to some
+form of a network.
+Each <code>NWS::Host</code> object has a numerical address associated with it
+by the <code>NWS::Network</code> object in a simulation, 
+and can contain zero or more <code>NWS::Software</code> instances.
+</p>
+<h5>NWS::Host Methods</h5>
+<ul>
+<li>Constructor: creating a new <code>Host</code> requires two arguments:
+a string identifying the "type" of the host, like "Linux-x86" or
+"Solaris-SPARC", and a number, the desired address for the newly
+constructed <code>Host</code> when you place it in a <code>Network</code>
+via <code>NWS::Network::AddHost</code>.
+<pre><code>
+	my $susceptible = new Host "OS-CPU", 0;
+	$network->AddHost($susceptible);
+</code></pre>
+<p>
+Since the above code fragment constructs <code>Host</code> instances
+with an address of zero, the <code>Network</code> object places the
+<code>Host</code> instances randomly in its address space.
+</p>
+</li>
+<li>
+<code>AddSoftware</code>: put <code>NWS::Software</code>
+into a <code>Host</code> instance.  Used in setup of simulations,
+but also useful in worm code, to install "back door" software as
+so many real life worms do.
+<pre><code>
+	my $wormhost = new Host "Linux-x86", 0;  # network assigns address
+	my $sw = new Software "ADMworm", $worm_code, 0;
+	$wormhost->AddSoftware($sw);  # host infected at simulation start
+</code></pre>
+<code>NWS::Host</code> only allows one <code>Software</code> instance
+of a particular identifier.  Since the <code>identifier</code> value
+gets used like TCP or UDP port numbers, this limitation shouldn't
+cause too much difficulty.
+</li>
+<li>
+<code>RemoveSoftware</code>: remove a specific instance of <code>NWS::Software</code>
+from a <code>Host</code> instance.
+<pre><code>
+	# Remove the offending exploited software
+	$host->RemoveSoftware('bind');
+</code></pre>
+Note that the string passed to <code>RemoveSoftware</code> removes
+based on value of <code>identifier</code> instance variable of the
+<code>Software</code>, not on the <code>true_name</code>.
+</li>
+<li>
+<code><a name="RANDADDRESS">RandAddress</a></code>: returns a scalar, a number somewhere in
+the simulation's address space.  Useful to random probing worms:
+<pre><code>
+	$host->SendMsg(
+		new Message
+			$host->RandAddress,
+			"Windows",
+			"IIS",
+			$software->{function}
+	);
+</code></pre>
+The <code>NWS::Host::RandAddress</code> method actually calls a method
+<code>NWS::Network::RandAddress</code>, because <code>Network</code>
+objects actually know the size of the address space.  You may wish
+to override <code>NWS::Host::RandAddress</code> with a different
+programmable random number generator
+(PRNG) if you disbelieve in Perl's built in PRNG, or you want to
+simulate a worm that uses a buggy or poorly-designed PRNG, like
+Code Red I v1.
+</li>
+<li>
+<code>TimeStep</code>: returns a scalar, the numerical value of the
+current time step. Might have use to when simulating something like Code Red
+going inactive the 20th of every month.
+</li>
+<li>
+<code><a name="SENDMSG">SendMsg</a></code>: initiate delivery of an <code>NWS::Message</code>
+object to an address in the simulation.  <code>Message</code> instances
+sent to an empty address get silently discarded.  No notion of successful
+or unsuccessful delivery gets returned to the sender.
+<pre><code>
+	$host->SendMsg(
+		Message->new(
+			67, 'OS-CPU', 'Exploited',
+			$software->{function}
+		)
+	);
+</code></pre>
+The above code fragment sends a <code>Message</code> to address 67.
+Should NWS find a <code>Host</code> at address 67, NWS follows the
+process described below
+in <code>RecvMsg</code> to either ignore the <code>Message</code>,
+pass the <code>Message</code> to a Perl function (worm code),
+or exploit a <code>Software</code> instance in the host at address 67.
+</li>
+<li>
+<code>RecvMsg</code>: method called by <code>Network</code> instance
+that contains the <code>Host</code>.  Causes the <code>Host</code> to
+decide whether to accept the message (message <code>identifier</code>
+matches the host <code>identifier</code>), deliver the message to some specific
+<code>Software</code> instance (value of message's <code>software</code>
+instance variable matches the name of some <code>Software</code> instance
+in the host), exploit the <code>Software</code> (matching <code>Software</code>
+instance has a true value in its <code>exploitable</code> instance variable)
+or merely deliver the message to the matching <code>Software</code>.
+</li>
+<li>
+<code>RunProcesses</code>: called by the <code>NWS::Network</code> instance
+that contains the <code>Host</code>.  Causing all executable functions
+contained by <code>Software</code> instances in the <code>Host</code> to
+get run once.  Called from <code>NWS::Network::Run</code> once each
+time step.
+</li>
+</ul>
+<h5>NWS::Host Instance variables</h5>
+<ul>
+<li>
+<code>identifier</code>: a string that allows simulations to distinguish
+between varieties of <code>Host</code> instances.  The value of <code>identifier</code>
+determines which messages (<code>NWS::Message</code> instances) the
+<code>Host</code> will accept. <code>NWS::Message</code> instances contain
+an identifier that must match the value of  <code>Host</code> instance
+variable <code>identifier</code> before any further processing gets done.
+The simulations in this document used a single identifier, but simulations
+of heterogeneous networks would use several.
+</li>
+<li>
+<code>address</code>: a scalar, the numerical value used to locate
+<code>Host</code> instances in a network.  Set by the <code>NWS::Host</code>
+constructor, but a zero value from construction lets
+the <code>NWS::Network</code> instance
+that a <code>Host</code> gets assigned to pick the address at random.
+</li>
+<li>
+<code>internet</code>: a reference to the <code>NWS::Network</code> instance
+containing the <code>Host</code>.  Allows worm code to get access to
+any member functions or instance variables of <code>NWS::Network</code>.
+</li>
+<li>
+<code><a name="MSG_CNT">msg_cnt</a></code> hash containing four keys:
+<ul>
+<li>
+<code>rcvd</code>: the number of <code>NWS::Message</code> instances
+delivered to this host.
+</li>
+<li>
+<code>matched</code>: the number of <code>NWS::Message</code> instances
+that matched this host's <code>identifier</code> value.
+Less than or equal to the value of <code>rcvd</code>
+</li>
+<li>
+<code>accepted</code>: the number of <code>NWS::Message</code> instances
+delivered to this host that got delivered to an instance of
+<code>NWS::Software</code> contained in the host.
+Less than or equal to the value of <code>matched</code>.
+</li>
+<li>
+<code>exploited</code>: the number of <code>NWS::Message</code> instances
+delivered to this host that exploited a vulnerability in the
+<code>NWS::Software</code> that accepted the messages.
+Less than or equal to the value of <code>accepted</code>.
+</li>
+</ul>
+</li>
+<li>
+<code>msg_seq_no</code>:
+A count of how many <code>Message</code> objects this <code>Host</code>
+has sent out. <code>msg_seq_no</code> gets incremented and used as
+the value of a <code>Message</code> object's
+<code>sequence</code> instance variable.
+</li>
+</ul>
+<p>Using <code>msg_cnt</code> correctly can allow you to keep track
+of the efficiency of a given address probing scheme.</p>
+<h4><a name="SOFTWARE">NWS::Software</a></h4>
+<p>
+Instances of class <code>NWS::Host</code> can contain instances of class
+<code>NWS::Software</code>.
+<code>NWS::Software</code> instances have a name, so that an <code>NWS::Host</code> can contain
+more than one instance of <code>NWS::Software</code>. This situation models real
+computers, which often run hundreds of different processes at any given instant.
+</p>
+<p>
+Instances of <code>NWS::Software</code> can contain actual code - 
+<a href="#WORMCODE">fragments of Perl code</a>
+that get actually compiled and executed when the simulation's <code>NWS::Network</code> tells
+the <code>NWS::Host</code> objects to run their processes.
+</p>
+<h5>NWS::Software Methods</h5>
+<ul>
+<li><code>NWS::Software</code> only has a constructor method.
+Creating a new instance of <code>Software</code>
+requires three arguments: a string naming the <code>Software</code>,
+a string containing a fragment of Perl code, and a number 0 or 1.
+</li>
+</ul>
+<p>
+Example <code>NWS::Software</code> constructor use:
+</p>
+<pre><code>
+	my $annunciator_code = qw{
+		my ($host, $software, $phase, $msg) = @_;
+		print "Host at ", $host-&gt;{address}, " called during phase ",
+			$phase, "\n";
+	};
+	my $sw = Software->new(
+		"Call phase Annunciator",
+		$annunciator_code,
+		0
+	);
+</code></pre>
+<p>
+The string naming the <code>Software</code> gets used to decide whether or
+not to accept a given <code>NWS::Message</code> object sent to a <code>Host</code>.
+The fragment of Perl code actually gets compiled (via an <code>eval BLOCK;</code>
+construct) and runs during simulation execution.
+The number indicates whether the <code>Software</code> is vulnerable
+(1) or not (0).
+</p>
+<p>
+The constructor method compiles any Perl fragment passed
+as an argument,
+and it sets <code>identifier</code> and <code>true_name</code> instance
+variables to the value of the first argument of the constructor.
+After that, the constructor calls the compiled Perl fragment
+with the <code>$Host::Init</code> phase argument.
+Worm code should change the <code>true_name</code> value 
+at this point.
+</p>
+<h5>NWS::Software Instance variables</h5>
+<ul>
+<li><code><a name="IDENTIFIER">identifier</a></code>: a scalar, a string used by <code>Host</code>
+instances to keep track of the <code>Software</code> instances they contain.
+Also used to discriminate between <code>Message</code> instances received
+by a <code>Host</code>: a <code>Message</code> has an instance variable
+that has to lexically equate to a <code>Software</code> instance's
+<code>identifier</code>.  In this respect, the <code>Software</code> instance's
+<code>identifier</code> acts something like a TCP or UDP port number.  It
+serves to direct message traffic to the intended process on the addressed host.
+All the examples in this document use a phrase like "Victim" or "IIS",
+<!-- apparently synonymous --> but simulations could use digit-strings
+for identifiers, too, increasing the verisimilitude of the simulation.
+</li>
+<li><code>function</code>: a reference to a closure created at construction
+from the Perl fragment passed as a string argument to the constructor.
+This is the "worm code" that this document frequently mentions. Called
+as a function at <a href="#CODERUNS">specific times</a> during
+a simulation's execution.
+</li>
+<li><code>exploitable</code>: a scalar, used as a boolean to decide whether
+or not a particular <code>Software</code> instance should be exploited
+by a just-received <code>Message</code>, or whether the <code>Message</code>
+should be passed to the <code>Software</code> instance's function.
+That is, <code>Software</code> instances have to be marked not exploitable
+before they receive messages with a phase of <code>$Host::Recv</code>.
+</li>
+<li><code><a name="TRUENAME">true_name</a></code>: a string. This string doesn't get used any
+where except in the <code>NWS::Network::PrintCounts</code> method, and it
+has no real life analog.
+The lack of real life analogy points out a real life difficulty:
+exactly how does one tell what a running process is?
+Infection of SQLServer by the "slammer" worm didn't change the process
+ID of the infected process.  <code>true_name</code> exists so that
+an NWS user can write worms that by convention set  <code>true_name</code>
+to indicate infection.  Without a distinguishing characteristic like
+<code>true_name</code>, NWS users would have to look at counts of
+messages flowing through the system to decide what a worm population
+was doing, just as real life network administrators do.
+</li>
+</ul>
+<h4><a name="MESSAGE">NWS::Message</a></h4>
+<p>
+Instances of class <code>NWS::Message</code> model frames or packets, and constitute the
+hunks of information that <code>NWS::Host</code> objects can pass between each other.
+The NWS simulations act as if the Internet mainly communicated using UDP/IP instead of TCP/IP.
+</p>
+<h5>NWS::Message Methods</h5>
+<ul>
+<li><code>NWS::Message</code> only has a constructor.  Arguments to the constructor
+set contents of all the instance variables that a user is responsible for:<br/>
+<pre><code>
+	my $probe = new Message
+		$host->RandAddress,    # Destination address
+		"Windows-x86",         # Host identifier
+		"IIS",                 # Software identifier
+		$software->{function}; # Worm code
+</code></pre>
+</li>
+</ul>
+<h5>NWS::Message Instance variables</h5>
+<ul>
+<li><code>destination</code>: a number, the address to which some
+entity sent the <code>Message</code>.
+Equates numerically to the recipient <code>Host's</code> address.
+Set by the user via the constructor method.
+</li>
+<li><code>source</code>: a number, the address of the entity that sent the <code>Message</code>. Set in <code><a href="#SENDMSG">NWS::Host::SendMsg</a></code>
+Useful to send <code>Message's</code> back to an attacking worm.
+</li>
+<li><code>identifier</code>: a string.
+Has to lexically equate to a <code>Host's</code> identifier before the
+<code>Host</code> will accept the message.
+Allows simulating heterogenous networks.
+Set by the user via the constructor method.
+</li>
+<li><code>software</code>: a string. The name of the <code>Software</code>
+for which the <code>Message</code> is intended.
+Analogous to TCP or UDP port number.  All examples in this document use names
+like "IIS" or "BIND", but "80" or "53" or "135" would work just as well.
+Set by the user via the constructor method.
+</li>
+<li><code>code</code>: function pointer.  Used to transport "worm code" from
+<code>Host</code> to <code>Host</code>.
+Set by the user via the constructor method.</li>
+<li><code>sequence</code>: a number, increasing from 1 for each <code>Message</code>
+a given <code>Host</code> sends.  Set in <code><a href="#SENDMSG">NWS::Host::SendMsg</a></code></li>
+</ul>
+<p>
+An entity sending an <code>NWS::Message</code> only has to fill in
+<code>destination</code>, <code>identifier</code> and <code>software</code>
+for the <code>Message</code> to pass through the delivery algorithm.
+</p>
+<p>
+The <code>code</code> instance variable is the means by which a
+worm passes executable content to another entity in the simulation.
+Usually, a programmer uses the <code>NWS::Software::function</code>
+contents to fill in <code>code</code>, but this isn't enforced.
+</p>
+<h3><a name="WORMCODE">Worm Code</a></h3>
+<p>
+Users of the NWS simulator see worm code as text, more specifically 
+as fragments of the Perl programming language.
+At runtime, an NWS simulation creates instances of class <code>NWS::Software</code>.
+If a programmer passes a Perl code fragment to the constructor
+of <code>NWS::Software</code>, the code fragment actually gets compiled via
+an <code>eval</code> statement. The instance of <code>NWS::Software</code> so
+constructed carries around a reference to the compiled code fragment,
+analogous to a function pointer in other programming languages.
+</p>
+<h4>Example Worm Code</h4>
+<p>
+The following 26-line fragment of Perl constitutes a fairly sophisticated
+worm. When executed in an NWS simulation, it sends infectious messages
+to random addresses.  If it receives an infectious message from another
+worm instance, it replies back.  If it receives a reply to an infectious
+message, it marks itself inactive, and sends no further messages.
+</p>
+<pre><code>
+     1	my $worm_code = q{
+     <a name="WL2">2</a>		my ($h, $sw, $c, $m) = @_;
+     <a name="WL3">3</a>		if ($c == $Host::Run and $sw-&gt;{active}) {
+     4			$h->SendMsg(
+     5				new Message
+     6					$h->RandAddress,
+     7					"OS-CPU",
+     8					"Victim",
+     9					$sw->{function}
+    10			);
+    <a name="WL11">11</a>		} elsif ($c == $Host::Recv) {
+    12			if (!$m->{already_infected}) {
+    <a name="WL13">13</a>				$m->{destination} = $m->{source};
+    14				$m->{already_infected} = $h->{address};
+    15				$m->{code} = 0;
+    16				$h->SendMsg($m);
+    17			} else {
+    <a name="WL18">18</a>				$sw->{true_name} = 'Worm - inactive';
+    19				$sw->{active} = 0;
+    20			}
+    <a name="WL21">21</a>		} elsif ($c == $Host::Init2 or $c == $Host::Init) {
+    22			$sw->{true_name} = 'Worm - active';
+    23			$sw->{exploitable} = 0;
+    24			$sw->{active} = 1;
+    25		}
+    26	};
+</code></pre>
+<ul>
+<li><a href="#WL2">line 2</a> illustrates the <a href="#WCCALLING">worm code
+calling convention</a>
+<li><a href="#WL3">lines 3-10</a> perform the work of infecting
+susceptible hosts. The worm probes randomly selected addresses,
+and sends its own code out, via the value of <code>$sw->{function}</code>.
+</li>
+<li><a href="#WL11">lines 11-20</a> perform one of two different actions
+upon receipt of a <code>Message</code>:
+<ol>
+<li><a href="#WL13">lines 13-16</a> reply to an infectious message
+from some other instance of the worm to let that other instance
+know it probed a worm, not a susceptible host or an empty address.
+This code adds an instance variable named <code>already_infected</code>
+to the <code>NWS::Message</code> instance before sending it back.
+</li>
+<li><a href="#WL18">lines 18, 19</a> react to the receipt of a message
+that some other worm sent using lines 13-16.  Lines 18 and 19 get executed
+if the <code>Message</code> referenced by <code>$m</code> has an instance
+variable named <code>already_infected</code> that has a value.
+Line 19 sets the <code>active</code> instance variable to 0,
+which means that the test on line 3 fails any subsequent times
+the worm code gets called with a <code>$c</code> value of 
+<code>$Host::Run</code>.  After executing line 19, the worm no
+longer probes for susceptible hosts.
+</li>
+</ol>
+</li>
+<li><a href="#WL21">lines 21-24</a> act during the two initialization
+phases: upon compilation during <code>Software</code> instance construction,
+and upon exploiting a vulnerable host.
+This piece of code sets the <code>true_name</code> instance variable,
+marks the <code>Software</code> as not vulnerable, and takes advantage
+of the Perl feature of dynamically adding instance variables to
+create and set the <code>active</code> instance variable.
+</ul>
+<p>
+If there is a trick to writing worm code, it's to realize that you have
+to write code that's not only thread-safe, but also re-entrant.
+</p>
+<h4><a name="CODERUNS">When worm code runs</a></h4>
+<p>
+The code contained by instances of class <code>NWS::Software</code> gets executed in
+four different situations.
+</p>
+<ol>
+<li>Just after an <code>NWS::Host</code> adds the software, in method <code>NWS::Host::AddSoftware</code></li>
+<li>Once each time step during normal network operation. An <code>NWS::Network</code> instance calls <code>NWS::Host::RunProcess</code>
+on each <code>NWS::Host</code> instance it contains at every time step.</li>
+<li>When a <code>NWS::Message</code> object makes its way from one <code>NWS::Host</code> to another.  If the receiving <code>NWS::Host</code> finds
+the message appropriate to its &quot;operating system&quot; and &quot;CPU&quot; it
+passes the incoming message to the appropriately named <code>NWS::Software</code> instance.  The <code>NWS::Software's</code>
+code gets executed, and the <code>NWS::Message</code> instance gets passed
+to the code.</li>
+<li>Just after exploiting an <code>NWS::Software instance</code>.</li>
+</ol>
+<p>
+<code>NWS::Software</code> instances execute the code once on construction
+ to allow the
+code to initialize run-time constants rather than recalculating the constants
+at every execution. Similarly, an <code>NWS::Host</code> causes the execution of any code an
+exploiting <code>NWS::Message</code> might contain just after the exploitation.  This allows
+worm code to set up and initialize.  Running code in <code>NWS::Software</code>
+instances
+that receive a <code>NWS::Message</code> allows <code>NWS::Hosts</code>
+to cooperate, or it allows 
+writing worms like CRclean, that style &quot;strike backs&quot;
+when they receive a particular <code>NWS::Message</code>.
+</p>
+<p>
+Code for a worm doesn't have to execute anything in any of
+the four situations. In the simple worm example section, <a href="#L15">line 15</a>
+constitutes the test for execution of the worm code during normal network
+operation.  <a href="#L16">Line 16</a> tests for execution just after
+exploitation. The simple worm code in the example gets executed in the
+two other situations (on message reception and at installation), but does
+nothing.
+</p>
+<h4><a name="WCCALLING">Worm code calling convention</a></h4>
+<p>
+When an NWS simulation executes the  <code>NWS::Network::Run</code> method,
+any compiled code fragments get called.  The arguments to the compiled
+code fragment look like this:
+</p>
+<ol>
+<li><code><a href="#HOST">NWS::Host</a></code> instance currently causing the code fragment to execute</li>
+<li><code><a href="#SOFTWARE">NWS::Software</a></code> instance that contains the code fragment</li>
+<li>A numerical code indicating the "phase" of execution. The four phases symbolically:
+<ul>
+<li><code>$Host::Init</code>: indicates that the code runs just after
+<code>NWS::Software</code> compiled it with an <code>eval</code>.</li>
+<li><code>$Host::Init2</code>: indicates that the code runs just
+after it has infected a new host.
+</li>
+<li><code>$Host::Run</code>: indicates that the code runs as its
+normal, once-per-time-step turn.</li>
+<li><code>$Host::Recv</code>: indicates that the code has received
+a <code>Message</code> object from some other entity in the simulation.
+</li>
+</ul>
+</li>
+<li>For phases <code>Host::Recv</code> and <code>Host::Init2</code>, the relevant <code>NWS::Message</code> object</li>
+</ol>
+<p>
+A <code>Message</code> object doesn't always appear in the
+worm code's argument list.  When a <code>Message</code> appears, the
+phase of execution determines what the <code>Message</code> contains.
+If the phase argument equates to <code>$Host::Init2</code>, the
+<code>Message</code> is the infectious communication that caused
+a new replicated worm instance to start.  If the phase argument
+equates to <code>$Host::Recv</code>, the <code>Message<code>
+argument came from a worm instance executing in some other
+<code>Host</code> in the network.
+</p>
+<h5>Worm code history</h5>
+<p>
+I believe that recounting what I did to arrive at the current 
+arrangement of worm code and its calling conventions would help
+the reader to understand how to write better worm code.
+Initially, I had every <code>NWS::Software</code> instance carrying
+around worm code as a string. Every time a <code>NWS::Software</code> instance
+got called upon to execute its code, an <code>eval</code> of the string
+took place.
+I did this because I didn't have a good idea of what information
+(including what objects) worm code would need access to in order
+to act realistically.  This technique worked, but it did cost a
+lot of execution time to <code>eval</code> a string in every worm during
+every time step.
+</p>
+<p>
+My second effort involved having <code>NWS::Software</code> instances
+carry around worm code as a string, and additionally carry the
+worm code around as a pointer to a closure (a dynamically
+compiled anonymous function).  Well-known names for information
+important to a worm's execution (<code>$host</code>, <code>$software</code>)
+existed when the code-as-string got compiled to a closure.
+Worms would send the code-as-string to potential targets.
+Upon exploitation, targets compiled the code-as-string to their own 
+private closures. This provided a fair performance increase, since
+<code>eval</code> didn't happen for every worm for every time step,
+and it also narrowed the information available to any given worm
+to well-known variable names present when strings got evaled to
+closures.
+</p>
+<p>
+To allow for simulation of different worm behavior, I had
+added arguments to calls to the worm code: a number indicating
+the "phase" of execution, and the message just received.
+I noticed that only a few well-know variables got used in
+even the most elaborate simulations: references to the <code>NWS::Host</code>
+and <code>NWS::Software</code> that contained the worm code.
+</p>
+<p>
+I also realized that the simulations spent large amounts of time compiling the
+worm code to a closure ever time a worm exploited a vulnerability.
+This caused me to change from compiling a closure for every infected
+<code>NWS::Software</code> instance to compiling a single closure.
+Instead of passing worm-code-as-text, the <code>NWS::Message</code>
+instances now contain a pointer to the appropriate closure.
+Instead of having well-known variables available to the closure
+at compile time, I changed the worm code calling convention to include
+exactly those well-known variables as arguments.  This brought down
+execution time and overall memory usage of any given simulation.
+</p>
+<h2>Further Work</h2>
+<h3>Gatewayed network simulation</h3>
+<p>
+Simulate Network Address Translation gateways and firewalls by
+including code in class <code>NWS::Network</code> that allows one
+instance of <code>NWS::Network</code>
+to contain a second instance of <code>NWS::Network</code>. 
+The second instance should
+pass messages appropriately by translating addresses,
+and contain a second set of
+<code>NWS::Host</code> instances.
+</p>
+<p>
+One could use such an enhanced <code>NWS::Network</code> class to
+simulate Code Red II's
+spread behind firewalls and gateways.
+</p>
+<h3>Rate limited devices</h3>
+<p>
+The current NWS simulation framework includes nothing with a performance
+problem. Real life networks have devices like firewalls or routers or
+specific software that suffers during a network worm epidemic.
+Rate limited devices or software end up getting bogged down by
+worm-related traffic, and either take a long time to deal with
+legitimate traffic, or drop legitimate traffic entirely.
+</p>
+<p>
+Adding rate-limiting bottlenecks to a network simulation would
+allow the use of NWS as more than a worm design tool.  Users
+could develop a worm and a network simulation without bottlenecks,
+than add or turn on bottleneck objects to see where the worm
+causes network failures.
+</p>
+<p>
+Rate limiting could take the form of a limit on how many 
+<code>NWS::Message</code> instances can pass in a time step,
+whether the remaining
+messages get queued or discard, or it could take the form of
+shutting down if the number of <code>Messages</code> to pass gets too large.
+</p>
+<p>
+A combination of rate limited devices and gatewayed networks could
+help to confirm <a href="http://tennis.ecs.umass.edu/~czou/research/codered.pdf">Cliff C Zou's two-parameter Code Red model</a>
+<sup><a href="#B12">[12]</a></sup>.
+</p>
+<h2>Bibliography</h2>
+<!--
+Having "footnote" style marks on referenced terms allows the use
+of this document even if printed to paper.  Given the purpose
+of a bibliography, make all links "self referencing".
+-->
+<ul>
+<li>[1]&nbsp;<a name="B1">The Jargon File</a>
+<p>
+Eric S. Raymond<br/>
+<a href="http://www.catb.org/~esr/jargon/html/W/worm.html">http://www.catb.org/~esr/jargon/html/W/worm.html</a>
+</p>
+</li>
+<li>[2]&nbsp;<a name="B2">The ELF Virus Writing HOWTO</a>, section 1.1
+<p>
+Alexander Bartolich, 2003-02-15<br/>
+<a href="http://www.linuxsecurity.com/resource_files/documentation/virus-writing-HOWTO/_html/intro.html#what.exactly.is.a.virus">http://www.linuxsecurity.com/resource_files/documentation/virus-writing-HOWTO/_html/intro.html#what.exactly.is.a.virus</a>
+</p>
+</li>
+<li>[3]&nbsp;<a name="B3">Email Virus Propagation Modeling and Analysis</a>
+<p>Cliff C. Zou, Down Towsley, Weibo Gong<br/>
+University of Massachusetts, Amherst, Technical Report TR-CSE-03-04<br/>
+<a href="http://tennis.ecs.umass.edu/~czou/research/emailvirus-techreport.pdf">http://tennis.ecs.umass.edu/~czou/research/emailvirus-techreport.pdf</a>
+</p>
+</li>
+<li>[4]&nbsp;<a name="B4">The Jargon File</a>
+<p>
+Eric S. Raymond<br/>
+<a href="http://www.jargon.net/jargonfile/f/forkbomb.html">http://www.jargon.net/jargonfile/f/forkbomb.html</a>
+</p>
+</li>
+<li>[5]&nbsp;<a name="B5">Cheese beats crackers</a>
+<p>
+Mark Ward, Tuesday, 22 May, 2001, 12:04 GMT 13:04 UK<br/>
+<a href="http://news.bbc.co.uk/1/hi/sci/tech/1344344.stm">http://news.bbc.co.uk/1/hi/sci/tech/1344344.stm</a>
+</p>
+</li>
+<li>[6]&nbsp;<a name="B6">The Case for Beneficial Computer Viruses and Worms</a>
+<p>
+Greg Moorer<br/>
+23rd National Information Systems Security Conference Proceeding<br/>
+October 16-19, 2000<br/>
+<a href="http://csrc.ncsl.nist.gov/nissc/2000/proceedings/papers/601.pdf">http://csrc.ncsl.nist.gov/nissc/2000/proceedings/papers/601.pdf</a>
+</p>
+</li>
+
+<li>[7]&nbsp;<a name="B7">Whitehat 'Max Vision' gets 18 months</a>
+<p>
+Kevin Poulsen<br/>
+The Register, <a href="http://www.theregister.co.uk/">http://www.theregister.co.uk/</a><br/>
+22/05/2001 at 19:01 GMT<br/>
+<a href="http://www.theregister.co.uk/content/archive/19132.html">http://www.theregister.co.uk/content/archive/19132.html</a>
+</p>
+</li>
+<li>[8]&nbsp;<a name="B8">Slashdot, News for Nerds. Stuff that matters.</a>
+<p>
+<a href="http://slashdot.org/">http://slashdot.org/</a>
+</p>
+</li>
+<li>[9]&nbsp;<a name="B9">Netcraft: Web Server Survey Archives</a>
+<p>
+As of August 2003, the Apache web server ran on 63.98% of sites surveyed.  Microsoft's IIS ran on 23.75%<br/>
+<a href="http://news.netcraft.com/archives/web_server_survey.html">http://news.netcraft.com/archives/web_server_survey.html</a>
+</p>
+</li>
+<li>[10]&nbsp;<a name="B10">How to 0wn the Internet in Your Spare Time</a>
+<p>
+Stuart Staniford, Vern Paxson, Nicholas Weaver<br/>
+Proceedings of the 11th USENIX Security Symposium (Security '02)<br/>
+<a href="http://www.usenix.org/publications/library/proceedings/sec02/">http://www.usenix.org/publications/library/proceedings/sec02/</a><br/>
+August 5-9, 2002<br/>
+<a href="http://www.icir.org/vern/papers/cdc-usenix-sec02/">http://www.icir.org/vern/papers/cdc-usenix-sec02/</a>
+</p>
+</li>
+<li>[11]&nbsp;<a name="B11">Internet Quarantine: Requirements for Containing Self-Propagating Code</a>
+<p>
+David Moore, Colleen Shannon, Geoffrey M. Voelker, Sefan Savage<br/>
+Proceedings of the 2003 IEEE Infocom Conference<br/>
+April, 2003<br/>
+<a href="http://www.cs.ucsd.edu/users/savage/papers/Infocom03.pdf">http://www.cs.ucsd.edu/users/savage/papers/Infocom03.pdf</a>
+</p>
+</li>
+<li>[12]&nbsp;<a name="B12">Code Red Worm Propagation Modeling and Analysis</a>
+<p>
+Cliff Changchun Zou, Weibo Gong, Don Towsley<br/>
+9th ACM Conference on Computer and Communication Security (CCS'02)<br/>
+November 18-22, 2002<br/>
+<a href="http://tennis.ecs.umass.edu/~czou/research/codered.pdf">http://tennis.ecs.umass.edu/~czou/research/codered.pdf</a>
+</p>
+</li>
+<li>[13]&nbsp;<a name="B13">SSF.App.Worm A Network Worm Modeling Package for SSFNet</a>
+<p>
+Michael Liljenstam<br/>
+<a href="http://www.cs.dartmouth.edu/~mili/research/ssf/worm/">http://www.cs.dartmouth.edu/~mili/research/ssf/worm/</a>
+</p>
+</li>
+<li>[14]&nbsp;<a name="B14">Scalable Simulation Framework</a>
+<p>
+<a href="http://www.ssfnet.org/homePage.html">http://www.ssfnet.org/homePage.html</a>
+</p>
+</li>
+<li>[15]&nbsp;<a name="B15">Directed-Graph Epidemiological Models of Computer Viruses</a>
+<p>
+Jeffrey O. Kephart and Steve R. White<br/>
+Proceedings of the 1991 IEEE Computer Society Symposium on Research in Security and Privacy<br/>
+May 20-22, 1991<br/>
+<a href="http://www.research.ibm.com/antivirus/SciPapers/Kephart/VIRIEEE/virieee.gopher.html">http://www.research.ibm.com/antivirus/SciPapers/Kephart/VIRIEEE/virieee.gopher.html</a>
+</p>
+</li>
+<li>[16]&nbsp;<a name="B16">GNU GENERAL PUBLIC LICENSE, version 2</a>
+<p>
+June 1991<br/>
+<a href="http://www.gnu.org/licenses/gpl.txt">http://www.gnu.org/licenses/gpl.txt</a>
+</p>
+</li>
+<li>[17]&nbsp;<a name="B17">Shining Light on Dark Address Space</a>
+<p>
+Craig Labovitz, Abha Ahuja, Michael Bailey<br/>
+November 13, 2001<br/>
+<a href="http://arbornetworks.com/downloads/dark_address_space.pdf">http://arbornetworks.com/downloads/dark_address_space.pdf</a>
+</p>
+</li>
+<li>[18]&nbsp;<a name="B18">Tcl Developer Site</a>
+<p>
+<a href="http://www.tcl.tk/">http://www.tcl.tk/</a>
+</p>
+</li>
+<li>[19]&nbsp;<a name="B19">Lua: an Extensible Embedded Language</a>
+<p>
+Luiz Henrique de Figueiredo, Roberto Ierusalimschy, and Waldemar Celes<br/>
+Dr. Dobb's Journal 21 #12 (Dec 1996) 26-33.<br/>
+<a href="http://www.lua.org/ddj.html">http://www.lua.org/ddj.html</a>
+</p>
+</li>
+<li>[20]&nbsp;<a name="B20">S-Lang Library Information Page</a>
+<p>
+<a href="http://www.s-lang.org/">http://www.s-lang.org/</a>
+</p>
+</li>
+<li>[21]&nbsp;<a name="B21">The Network Simulator - ns-2</a>
+<p>
+<a href="http://www.isi.edu/nsnam/ns/">http://www.isi.edu/nsnam/ns/</a>
+</p>
+</li>
+<li>[22]&nbsp;<a name="B22">Models: Why?</a>
+<p>
+Ben Bolker<br/>
+14 Nov 2000<br/>
+<a href="http://www.zoo.ufl.edu/bolker/eep-2000/si1.html">http://www.zoo.ufl.edu/bolker/eep-2000/si1.html</a>
+</p>
+</li>
+<li>[23]&nbsp;<a name="B23">Christmas 1988 Decnet Worm -- Counteracted</a>
+<p>
+Cliff Stoll<br/>
+RISKS-FORUM Digest  Wednesday 4 January 1989   Volume 8 : Issue 2<br/>
+27 Dec 88<br/>
+<a href="ftp://ftp.sri.com/risks/8/risks-8.02">ftp://ftp.sri.com/risks/8/risks-8.02</a>
+</p>
+</li>
+<li>[24]&nbsp;<a name="B24">A Brief Analysis of the ADM Internet Worm</a>
+<p>
+Max Vision<br/>
+circa May 1998<br/>
+<a href="http://www.whitehats.com/library/worms/adm/index.html">http://www.whitehats.com/library/worms/adm/index.html</a>
+</p>
+</li>
+<li>[25]&nbsp;<a name="B25">CAIDA Analysis of Code-Red</a>
+<p>
+<a href="http://www.caida.org/analysis/security/code-red/#crv2">http://www.caida.org/analysis/security/code-red/#crv2</a>
+</p>
+</li>
+<li>[26]&nbsp;<a name="B26">OpenSSL Vulnerabilities</a>
+<p>
+Johannes Ullrich<br/>
+2002-09-16<br/>
+<a href="http://isc.incidents.org/analysis.html?id=167">http://isc.incidents.org/analysis.html?id=167</a>
+</p>
+</li>
+<li>[27]&nbsp;<a name="B27">Global Slapper Worm Information Center</a>
+<p>
+F-Secure Corporation<br/>
+<a href="http://www.europe.f-secure.com/slapper/">http://www.europe.f-secure.com/slapper/</a>
+</p>
+</li>
+<li>[28]&nbsp;<a name="B28">The Logistic Equation and Integration by Partial Fractions</a>
+<p>
+University of British Columbia Department of Mathematics<br/>
+<a href="http://www.ugrad.math.ubc.ca/coursedoc/math101/notes/moreApps/logistic.html">http://www.ugrad.math.ubc.ca/coursedoc/math101/notes/moreApps/logistic.html</a>
+</p>
+</li>
+<li>[29]&nbsp;<a name="B29">Euler's Method</a>
+<p>
+Joel Feldman<br/>
+<a href="http://www.math.ubc.ca/~feldman/math/odesolvers.pdf">http://www.math.ubc.ca/~feldman/math/odesolvers.pdf</a>
+</p>
+</li>
+<li>[30]&nbsp;<a name="B30">The SIR Model for Spread of Disease</a>
+<p>
+David Smith and Lang Moore, Duke University<br/>
+<a href="http://www.math.duke.edu/education/ccp/materials/postcalc/sir/contents.html">http://www.math.duke.edu/education/ccp/materials/postcalc/sir/contents.html</a>
+</p>
+</li>
+<li>[31]&nbsp;<a name="B31">Re: CodeGreen beta release (idq-patcher/antiCodeRed/etc.)</a>
+<p>
+Markus Kern<br/>
+Sept 1 2001<br/>
+VULN-DEV email list<br/>
+<a href="http://www.securityfocus.com/archive/82/211462">http://www.securityfocus.com/archive/82/211462</a>
+</p>
+</li>
+
+<li>[32]&nbsp;<a name="B32">Scalper and Slapper Worms Genealogy</a>
+<p>
+David Goldsmith<br/>
+2002-10-02<br/>
+<a href="http://isc.incidents.org/analysis.html?id=177">http://isc.incidents.org/analysis.html?id=177</a>
+</p>
+</li>
+<li>[33]&nbsp;<a name="B33">Lion Internet Worm Analysis</a>
+<p>
+Max Vision<br/>
+circa April, 2001<br/>
+<a href="http://www.whitehats.com/library/worms/lion/index.html">http://www.whitehats.com/library/worms/lion/index.html</a>
+</p>
+</li>
+
+<li>[34]&nbsp;<a name="B34">Incident Note IN-2001-05 - The "cheese" worm</a>
+<p>
+Kevin Houle<br/>
+Thursday, May 17, 2001<br/>
+<a href="http://www.cert.org/incident_notes/IN-2001-05.html">http://www.cert.org/incident_notes/IN-2001-05.html</a>
+</p>
+</li>
+
+<li>[35]&nbsp;<a name="B35">Advisory CA-2003-20 W32/Blaster worm</a>
+<p>
+Chad Dougherty, Jeffrey Havrilla, Shawn Hernan, and Marty Lindner<br/>
+August 14, 2003<br/>
+<a href="http://www.cert.org/advisories/CA-2003-20.html">http://www.cert.org/advisories/CA-2003-20.html</a>
+</p>
+</li>
+
+<li>[36]&nbsp;<a name="B36">Recode from disassembly of the Win32 DCOM worm </a>
+<p>
+Rolf Rolles<br/>
+August, 2003<br/>
+VULN-DEV email list<br/>
+<a href="http://lists.insecure.org/lists/vuln-dev/2003/Aug/att-0029/RPC_DCOM_recode_and_analysis.TXT">http://lists.insecure.org/lists/vuln-dev/2003/Aug/att-0029/RPC_DCOM_recode_and_analysis.TXT</a>
+</p>
+</li>
+
+<li>[37]&nbsp;<a name="B37"> IP v4 Address Space Utilization</a>
+<p>
+Sean McCreary and kc claffy<br/>
+8/27/98<br/>
+<a href="http://www.caida.org/outreach/resources/learn/ipv4space/">http://www.caida.org/outreach/resources/learn/ipv4space/</a>
+</p>
+</li>
+</ul>
+<h2>Development Environment</h2>
+<p>
+I did not use large numbers of tools, or an expensive hardware setup to develop
+NWS.
+</p>
+<ul>
+<li>SuSE 7.3 linux - <a href="http://www.suse.com">http://www.suse.com</a></li>
+<li>Perl v5.6.1 built for i586-linux - <a href="http://www.perl.org">http://www.perl.org</a></li>
+<li>The vim  text editor - <a href="http://www.vim.org">http://www.vim.org</a></li>
+<li>The Gnuplot interactive plotting program - <a href="http://www.gnuplot.info/">http://www.gnuplot.info/</a></li>
+</ul>
+<p>
+The computer running SuSE 7.3 linux had a 1 GHz AMD Duron processor on a Micro ATX MS-6340M motherboard,
+with 256 Mb of memory. This computer ran 20, 135-time step NWS simulations in about 15 minutes wall clock time.
+</p>
+</body>
+</html>

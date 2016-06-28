@@ -1,0 +1,100 @@
+#!/bin/ksh
+# Copyright 2003, Bruce Ediger
+# This file is part of NWS.
+#
+# NWS is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# NWS is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with NWS; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+# $Id: runwf,v 1.4 2003/08/29 04:03:09 bediger Exp $
+
+# Run wormfight.pl or variant a certain number of times
+
+function usage {
+	echo "Usage: $0 -d directoryname -p programname [-m maxruns (default 1)] [-z quoted_extra_flags]" >&2
+}
+
+DIR=
+PROG=
+MAX=0
+BAILOUT=0
+EXTRA_ARGS=
+
+while [ ! -z "$1" ]
+do
+	case $1 in
+	-d) DIR="$2"
+		shift
+		;;
+	-p) PROG="$2"
+		shift
+		;;
+	-m) MAX="$2"
+		shift
+		;;
+	-h)
+		usage
+		exit 0
+		;;
+	-z)
+		EXTRA_ARGS=$2
+		shift
+		;;
+	*)
+		;;
+	esac
+	shift
+done
+
+if [ -z "$DIR" ]
+then
+	echo "Must specify destination directory name on command line" >&2
+	BAILOUT=$(($BAILOUT + 1))
+fi
+
+if [ -z "$PROG" -o ! -x "$PROG" ]
+then
+	echo "Must specify executable on command line" >&2
+	BAILOUT=$(($BAILOUT + 1))
+fi
+
+if (($BAILOUT > 0))
+then
+	usage
+	exit $BAILOUT
+fi
+
+rm -rf "$DIR"
+mkdir "$DIR"
+if [ ! -d "$DIR" ]
+then
+	echo "Could not create $DIR for some reason" >&2
+	exit 2
+fi
+
+COUNT=1
+
+if (( $MAX < 1 ))
+then
+	# Make it run at least once
+	MAX=1
+fi
+
+
+while (( $COUNT <= $MAX ))
+do
+	echo $COUNT
+	date
+	./$PROG $EXTRA_ARGS > $DIR/wf$COUNT.out
+	COUNT=$(($COUNT + 1))
+done

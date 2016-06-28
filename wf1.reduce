@@ -1,0 +1,74 @@
+#!/bin/ksh
+# Copyright 2003, Bruce Ediger
+# This file is part of NWS.
+#
+# NWS is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# NWS is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with NWS; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+# $Id: wf1.reduce,v 1.6 2003/08/29 04:03:09 bediger Exp $
+
+DIR=$1
+
+# Assumes that $DIR contains a string ending in 1 or more digits
+SUFFIX=$(echo $DIR | sed 's/[^0-9]*\([0-9].*\)/\1/')
+
+PREFIX=wf$SUFFIX
+
+rm -f $PREFIX.raw
+
+for fname in $DIR/wf*.out
+do
+	awk 'BEGIN {cr1v2=0;cr2=0;} /Final .Code Red I v2./ {cr1v2=$7;} /Final .Code Red II./{cr2=$6;} END {print cr1v2, cr2;}' $fname >> $PREFIX.raw
+done
+
+echo "# CR 1 v2, CR II"
+echo "# wins"
+echo "# mean number of infections per run"
+echo "# median number of infections per run"
+echo "# CR1 v2 max and min"
+echo "# CR2 max and min"
+
+awk 'BEGIN{files=0;cr1v2_cnt=0;cr2_cnt=0;cr1v2_win=0;cr2_win=0; cr1v2_max=-1; cr1v2_min=20000; cr2_max=-1; cr2_min=20000;}\
+	/^[^#]/{\
+		cr1v2_infections[files] = $1;\
+		cr2_infections[files] = $2;\
+		cr1v2_cnt += $1; \
+		cr2_cnt += $2; \
+		if ($1 > $2) {++cr1v2_win} else {++cr2_win}\
+		if ($1 > cr1v2_max) {cr1v2_max = $1;}\
+		if ($1 < cr1v2_min) {cr1v2_min = $1;}\
+		if ($2 > cr2_max) {cr2_max = $2;}\
+		if ($2 < cr2_min) {cr2_min = $2;}\
+		++files;\
+	}\
+	END{ \
+		print cr1v2_win, cr2_win;\
+		cr1v2_ave = cr1v2_cnt/files;\
+		cr2_ave = cr2_cnt/files;\
+		print cr1v2_ave, cr2_ave;\
+		asort(cr1v2_infections); \
+		asort(cr2_infections); \
+		if ((files%2) == 1) { \
+			files += 1; \
+			cr1v2_median = cr1v2_infections[files/2];\
+			cr2_median = cr2_infections[files/2];\
+		} else { \
+			cr1v2_median = (cr1v2_infections[files/2] + cr1v2_infections[files/2 + 1])/2; \
+			cr2_median = (cr2_infections[files/2] + cr2_infections[files/2 + 1])/2; \
+		}\
+		print cr1v2_median, cr2_median; \
+		print cr1v2_max, cr1v2_min;\
+		print cr2_max, cr2_min;\
+	}'\
+	 $PREFIX.raw
