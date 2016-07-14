@@ -1,17 +1,28 @@
 # Discrete time step simulation of network worms and fully-connected networks.
 
-From September, 2003
+### From September, 2003
 
 The project is supposed to constitute an easy-to-use way to check all the
 assertions the experts made about worms. If you'll recall, 2003 was about the
-peak worm year, with "Slammer" in January, XXX, YYY and ZZZ throughout the
-year.
+peak worm year, with "Slammer" in January, Blaster, Welchia and Sobig in August,
+and many minor worms throughout.
 
-Experts crawled out of the woodwork to explain 
+Experts crawled out of the woodwork to explain what was happening and why. I
+felt like the experts were speaking through their hats, with only partial
+examples and handwaving. They had no theory or models to inform or back up
+their assetions.
+
+## Motivation
+
+I've wanted to make a standalone project since the mid 80s. By "standalone", I
+mean an integration of code, documentation and supporting programs. Such a project
+should allow the curious to understand the project, rebuild it, and explore the
+subject of the project. NWS has an XHTML file `index.html`, which describes a
+system for modeling the spread of network worms. That same system is used to create
+the referenced in the XHTML file. The XHTML file explains the example code, and
+suggests further experiments.
 
 ## Installation
-
-INSTALLATION OF NWS
 
 NWS does not install the traditional Perl way
 (perl Makefile.PL; make; make test; make install).  NWS doesn't constitute
@@ -55,7 +66,7 @@ assuming that the NWS distribution file (nws.tar.gz) resides in /tmp:
 
 Hopefully, you get the picture.
 
-### TROUBLESHOOTING
+### Troubleshooting
 
 I did development of NWS on a SuSE 7.3 Linux machine, so the "#!"
 line of generic.pl (or any simulation you write) may have to change.
