@@ -34,7 +34,7 @@ zip:
 web:
 	rm -rf nws_web
 	mkdir nws_web
-	cp nws.tar.gz *.png index.html *.pl Permutation.pm index.html nws_web
+	cp nws.tar.gz *.png index.html *.pl Permutation.pm nws_web
 
 WORMFIGHT: WORMFIGHT2 WORMFIGHT3
 
@@ -64,49 +64,74 @@ WORMFIGHT3: wormfight3.pl runwf wf1.reduce
 
 # Run SIS simulation 20 times, calculating mean values of
 # number of infected hosts at each timestep.
-SISMEAN: generic.pl runwf sir_mean.pl sis.pl discrete_sis.pl
+mean.dat: generic.pl runwf sir_mean.pl sis.pl discrete_sis.pl
 	./runwf -d gentest -p generic.pl -z '-w 7 -V 9993' -m 20
 	./sir_mean.pl gentest/*.out > mean.dat
+
+sis.out: sis.pl
 	./sis.pl > sis.out
+
+discrete_sis.out: discrete_sis.pl
 	./discrete_sis.pl > discrete_sis.out
 
 # Run SIR (CRclean) simulation 20 times, calculating
 # mean values of susceptible (IIS), infected (Code Red),
 # resistant (CRclean) at each timestep
-SIRMEAN: crclean.pl runwf sir_mean.pl 
+crclean.dat: crclean.pl runwf sir_mean.pl 
 	./runwf -d crcleantest -p crclean.pl -z '-w 7 -c 7 -V 9986' -m 20
 	./sir_mean.pl crcleantest/*.out > crclean.dat
 
 # Run 1i0n/Cheese simulation 20 times
-CHEESEMEAN: cheese.pl runwf sir_mean.pl sir.out
+cheese_mean.dat: cheese.pl runwf sir_mean.pl
 	./runwf -z '-w 7 -c 7 -V 9986' -d cheese_mean -p cheese.pl -m 20
 	./sir_mean.pl cheese_mean/*.out > cheese_mean.dat
 
-PERMUTATION: runwf permutation.pl Permutation.pm sir_mean.pl mkhist random.hist
+permutation.dat permutation.hist: runwf permutation.pl Permutation.pm sir_mean.pl mkhist random.hist
 	./runwf -p permutation.pl -d permutation -m 20 -z '-w 7 -V 9993'
 	./sir_mean.pl permutation/wf*.out > permutation.dat
 	./mkhist permutation/*.out  > permutation.hist
 
 random.hist:
-	./mkhist gentest/*.out      > random.hist
+	./mkhist gentest/*.out > random.hist
 
-MSBLAST: msblast.pl runwf sir_mean.pl mkhist random.hist
+msblast_random_mean.dat: runwf msblast.pl sir_mean.pl
 	./runwf -d msblast.random -p msblast.pl -z '-w 7 -V 9993' -m 20
 	./sir_mean.pl msblast.random/*.out > msblast_random_mean.dat
+
+msblast.random.hist: msblast_random_mean.dat
 	./mkhist msblast.random/*.out > msblast.random.hist
+
+msblast_banded_mean.dat: runwf msblast.pl sir_mean.pl
 	./runwf -d msblast.banded -p msblast.pl -z '-w 7 -V 9993 -B 9' -m 20
 	./sir_mean.pl msblast.banded/*.out > msblast_banded_mean.dat
+
+msblast.banded.hist: mkhist msblast_banded_mean.dat
 	./mkhist msblast.banded/*.out > msblast.banded.hist
+
+random.banded.dat: runwf generic.pl sir_mean.pl
 	./runwf -d random.banded -p generic.pl -z '-w 7 -V 9993 -B 9' -m 20
 	./sir_mean.pl random.banded/*.out > random.banded.dat
+
+random.banded.hist: random.banded.dat sir_mean.pl mkhist
 	./mkhist random.banded/*.out > random.banded.hist
 
 
-graphs: SISMEAN SIRMEAN CHEESEMEAN PERMUTATION MSBLAST sir.out
+graphs: histogram.png rand.perm.png euler.png cheese.comparison.png sis.mean.png msblast.png
+
+histogram.png rand.perm.png: permutation.plots random.hist permutation.hist \
+		mean.dat permutation.dat
 	gnuplot permutation.plots
+
+euler.png: sir.out crclean.dat sir.plots
 	gnuplot sir.plots
+
+cheese.comparison.png: cheese.plots sir.out cheese_mean.dat
 	gnuplot cheese.plots
+
+sis.mean.png: mean.plots mean.dat discrete_sis.out
 	gnuplot mean.plots
+
+msblast.png: msblast.plots mean.dat random.banded.dat msblast_random_mean.dat msblast_banded_mean.dat
 	gnuplot msblast.plots
 
 lint:

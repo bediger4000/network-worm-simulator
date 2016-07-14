@@ -23,7 +23,7 @@ set term png
 set xlabel "Timestep"
 set ylabel "Number of hosts infected"
 set title "SIS Model"
-set data style points
+set style data points
 set yrange [0:12000]
 set out 'sis.mean.png'
 plot \

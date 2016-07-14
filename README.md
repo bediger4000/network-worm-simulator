@@ -2,9 +2,9 @@
 
 From September, 2003
 
-The idea was to create an easy-to-use way to check all the assertions
-the experts made about worms. If you'll recall, 2003 was about the peak
-worm year, with "Slammer" in January, XXX, YYY and ZZZ throughout the
+The project is supposed to constitute an easy-to-use way to check all the
+assertions the experts made about worms. If you'll recall, 2003 was about the
+peak worm year, with "Slammer" in January, XXX, YYY and ZZZ throughout the
 year.
 
 Experts crawled out of the woodwork to explain 

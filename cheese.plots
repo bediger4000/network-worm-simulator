@@ -20,7 +20,7 @@ set term png
 set xlabel "Timestep"
 set ylabel "Number of hosts"
 set title "Cheese vs 1i0n model"
-set data style points
+set style data points
 set yrange [0:12000]
 ## Compare mean of 20 runs of cheese.pl with Euler's method numerical simulation
 set out 'cheese.comparison.png'

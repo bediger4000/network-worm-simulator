@@ -20,7 +20,7 @@ set yrange [0:12000]
 set xlabel "Timestep"
 set ylabel "Number of infected hosts"
 set title "msblast and Random Probing worms compared"
-set data style points
+set style data points
 set term png
 set out 'msblast.png'
 plot 'mean.dat' using 1:3 title 'Random probe worm, random victim addresses', \
