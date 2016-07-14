@@ -33,6 +33,13 @@ system for modeling the spread of network worms. That same system is used to cre
 the graphs referenced by the XHTML file. The XHTML file explains the example code, and
 suggests further experiments.
 
+## Rebuilding the report
+
+The file `index.html` is a complete technical description of the NWS system.
+To rebuild everything referred to by `index.html`, invoke `make`. This can take
+some time, and requires `make`, `perl`, `bash`, the usual cast of Linux shell
+utiliites, and `gnuplot`
+
 ## Installation
 
 NWS does not install the traditional Perl way
@@ -85,6 +92,7 @@ If generic.pl fails with a message like:
 
     bash: ./generic.pl: bad interpreter: No such file or directory
 or
+
     zsh: no such file or directory: ./generic.pl
 
 Try doing `which perl` to see the fully-qualified path to the perl
