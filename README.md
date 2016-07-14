@@ -12,6 +12,17 @@ felt like the experts were speaking through their hats, with only partial
 examples and handwaving. They had no theory or models to inform or back up
 their assetions.
 
+The code in this project allows a programmer to simulate the spread of network
+worms under various circumstances. The code assumes a simple network with numerical
+addresses. Not all addresses have functioning machines, similar to the real Internet.
+The code also assumes a fully connected Internet, with every machine able to send
+a message to every other machine. Time passes in discrete steps with messages sent
+and delivered in the same time step. Each machine can execute once per time step,
+sending a message that causes execution in some machine at another address.
+
+Building in "vulnerabilities", and allowing each machine to execute Perl code causes
+network worms to fall out of the simulation.
+
 ## Motivation
 
 I've wanted to make a standalone project since the mid 80s. By "standalone", I
@@ -19,7 +30,7 @@ mean an integration of code, documentation and supporting programs. Such a proje
 should allow the curious to understand the project, rebuild it, and explore the
 subject of the project. NWS has an XHTML file `index.html`, which describes a
 system for modeling the spread of network worms. That same system is used to create
-the referenced in the XHTML file. The XHTML file explains the example code, and
+the graphs referenced by the XHTML file. The XHTML file explains the example code, and
 suggests further experiments.
 
 ## Installation
